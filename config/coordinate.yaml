@@ -1,0 +1,38 @@
+# 좌표·제어 설정 — 통합부(김선형)
+# 좌표 원점: 레일 왼쪽 끝 X=0, 레일 중심선 Y=0, 책상면 Z=0 (도면집 기준)
+# rail_* 값은 추정치. 도면집 "조립 순서 8"대로 조립 후 Homing 실측하여 갱신할 것.
+
+rail:
+  length_mm: 800          # 2040 V슬롯 전체 길이
+  travel_mm: 530          # 캐리지 중심 이동 범위 (추정, 실측 후 갱신)
+  limit_left_mm: 75       # 왼쪽 리미트 스위치 위치 (X)
+  limit_right_mm: 725     # 오른쪽 리미트 스위치 위치 (X)
+  home_offset_mm: 5       # Homing 접촉 지점에서 원점(0)까지 여유
+
+stepper:
+  microstep: 16           # A4988 마이크로스텝 (1/16)
+  steps_per_rev: 200      # NEMA17 기본 (1.8도)
+  belt_pitch_mm: 2        # GT2
+  pulley_teeth: 20        # 20T → 1회전당 40mm 이동
+  # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 3200 = 0.0125
+
+# 거리(cm) → 송풍 세기 3단계 (멀수록 강풍)
+fan_power:
+  near_max_cm: 50         # ≤50cm  → 미풍
+  mid_max_cm: 120         # 50~120 → 약풍
+  duty_near: 40           # 미풍 (%) — 하한(이 이하면 팬 안 돎)
+  duty_mid: 70            # 약풍
+  duty_far: 100           # 강풍
+  hysteresis_cm: 5        # 구간 경계 떨림 방지
+
+# 제어 로직 파라미터
+control:
+  no_person_timeout_s: 30   # 미검출 지속 시 자동 정지
+  cooldown_s: 5             # 방금 송풍받은 대상 재선정 제외 시간
+  min_dwell_s: 8            # 한 대상 최소 유지 송풍 시간 (잦은 왕복 방지)
+  deadzone_mm: 20           # 작은 좌표 흔들림 무시 (재이동 안 함)
+
+# 우선순위 "유사" 임계값 (단계식 동점 처리)
+priority:
+  cooled_similar_s: 2       # 누적 송풍시간 차이 이내면 다음 기준(대기시간)으로
+  wait_similar_s: 2         # 대기시간 차이 이내면 다음 기준(거리)으로
