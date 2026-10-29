@@ -68,14 +68,3 @@ class FanController:
     def cleanup(self) -> None:
         self._pwm.stop()
         self._GPIO.cleanup(self.pin)
-
-
-if __name__ == "__main__":
-    # 하드웨어 없이 매핑 로직만 테스트
-    print("거리(cm) → 송풍 세기(%)")
-    prev = None
-    for d in [30, 48, 52, 55, 100, 118, 125, 200]:
-        duty = distance_to_duty(d, prev)
-        label = {40: "미풍", 70: "약풍", 100: "강풍"}[duty]
-        print(f"  {d:>4}cm → {duty:>3}% ({label})")
-        prev = duty

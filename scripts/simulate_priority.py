@@ -3,14 +3,18 @@
 가상 작업자 N명을 두고 우선순위 알고리즘으로 송풍 대상을 번갈아 선정하며,
 "인당 누적 송풍시간 편차 %"를 계산한다. (보고서 성능지표: 편차 20% 이내 목표)
 
-실행:  python3 src/control/simulate_priority.py
+실행:  python3 scripts/simulate_priority.py
 """
 
 from __future__ import annotations
 
+import os
 import random
 import statistics
+import sys
 
+# 로직 모듈(src/control/priority.py) import 경로 추가
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "control"))
 from priority import Worker, pick_target
 
 

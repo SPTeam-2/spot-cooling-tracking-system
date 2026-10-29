@@ -7,13 +7,17 @@
 목적: "단순 추적/최근접"이 아니라 '다인원 공정 분배'가 핵심 기여임을 수치로 보여줌.
 결과를 콘솔 표 + 막대그래프(PNG)로 출력 → 캡스톤 신청서 근거자료로 사용.
 
-실행:  python3 src/control/compare_strategies.py
+실행:  python3 scripts/compare_strategies.py
 """
 
 from __future__ import annotations
 
+import os
 import statistics
+import sys
 
+# 로직 모듈(src/control/priority.py) import 경로 추가
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "control"))
 from priority import Worker, pick_target
 
 
@@ -113,9 +117,8 @@ def _plot(labels, nearest, priority) -> None:
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
 
-    import os
     # 저장 위치는 실행 디렉터리와 무관하게 레포 루트의 docs/로 고정
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     docs_dir = os.path.join(repo_root, "docs")
     os.makedirs(docs_dir, exist_ok=True)
     out = os.path.join(docs_dir, "strategy_comparison.png")
