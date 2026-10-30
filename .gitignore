@@ -5,5 +5,9 @@ __pycache__/
 .venv/
 venv/
 
+# 모델 가중치 / 캘리브레이션 데이터
+*.pt
+data/
+
 # macOS
 .DS_Store
