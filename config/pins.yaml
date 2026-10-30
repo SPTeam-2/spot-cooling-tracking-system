@@ -1,0 +1,23 @@
+# GPIO 핀 배치 (BCM 기준) — 통합부(김선형) 확정
+# 도면집 "전원·신호도"의 '핀 번호는 통합부에서 확정' 반영.
+# 실제 배선 후 충돌/동작 확인하고 조정할 것. I2C(2,3)·SPI(7~11) 기본핀은 피함.
+
+fan:
+  pwm: 18            # 팬 MOSFET(D4184) 게이트 → PWM (하드웨어 PWM 가능 핀)
+
+stepper:             # A4988 → NEMA17
+  step: 20
+  dir: 21
+  enable: 16         # (선택) EN 핀 — 미사용 시 GND 고정 가능
+
+servo:
+  pan: 12            # 팬 서보(좌우) PWM (하드웨어 PWM 가능)
+  tilt: 13           # 틸트 서보(상하) PWM (하드웨어 PWM 가능)
+
+limit_switch:        # 레버형 리미트 스위치 2개 (입력, 내부 풀업)
+  left: 5
+  right: 6
+
+ultrasonic:          # HC-SR04 (Echo는 1k/2k 분압으로 3.3V 변환)
+  trig: 23
+  echo: 24
