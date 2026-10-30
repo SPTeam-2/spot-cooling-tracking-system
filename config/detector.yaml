@@ -3,3 +3,4 @@ model: models/yolo11n.pt   # 없으면 처음 실행할 때 자동 다운로드
 conf: 0.5                  # 이 값보다 확신이 낮은 검출은 버림
 imgsz: 640                 # YOLO 입력 크기 (작을수록 빠르고 덜 정확)
 ref_y_ratio: 0.3           # 기준점 높이: 박스 위에서부터 30% 지점 (상체 중심)
+tracker: config/bytetrack_custom.yaml
