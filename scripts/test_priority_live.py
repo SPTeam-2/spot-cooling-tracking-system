@@ -133,7 +133,8 @@ def main():
             is_target = target is not None and d.track_id == target.wid
             c = (0, 0, 255) if is_target else (0, 255, 0)
             cv2.rectangle(frame, (x1, y1), (x2, y2), c, 4 if is_target else 2)
-            label = f"ID {d.track_id}" + ("  << TARGET" if is_target else "")
+            rail_txt = f" | rail {rail_pos[d.track_id]:.0f}mm" if d.track_id in rail_pos else ""
+            label = f"ID {d.track_id}{rail_txt}" + ("  << TARGET" if is_target else "")
             cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, c, 2)
 
         h, w_img = frame.shape[:2]
