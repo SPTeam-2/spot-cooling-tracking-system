@@ -27,14 +27,14 @@ def _spread_pct(vals: list[float]) -> float:
     return (max(vals) - min(vals)) / m * 100 if m else 0.0
 
 
-def run(strategy: str, distances_cm, total_s=600, min_dwell_s=8.0, cooldown_s=5.0):
+def run(strategy: str, distances_mm, total_s=600, min_dwell_s=8.0, cooldown_s=5.0):
     """3명 고정 거리 상황을 total_s초간 1초 단위로 시뮬레이션.
 
     strategy="nearest" : 매 순간 가장 가까운 사람 (공정성 고려 X)
     strategy="priority": 우리 우선순위 알고리즘
     반환: 인당 누적 송풍시간 리스트
     """
-    workers = [Worker(wid=i, distance_cm=d) for i, d in enumerate(distances_cm)]
+    workers = [Worker(wid=i, distance_mm=d) for i, d in enumerate(distances_mm)]
     current: Worker | None = None
     dwell_left = 0.0
 
@@ -43,7 +43,7 @@ def run(strategy: str, distances_cm, total_s=600, min_dwell_s=8.0, cooldown_s=5.
             if strategy == "nearest":
                 # 단순 방식: 검출된 사람 중 가장 가까운 사람 (누적/대기 무시)
                 cands = [w for w in workers if w.detected]
-                target = min(cands, key=lambda w: w.distance_cm) if cands else None
+                target = min(cands, key=lambda w: w.distance_mm) if cands else None
             else:
                 target = pick_target(workers, now=t)
             if target is not None and target is not current:
@@ -70,13 +70,13 @@ def run(strategy: str, distances_cm, total_s=600, min_dwell_s=8.0, cooldown_s=5.
 
 
 def main() -> None:
-    distances = [60, 110, 180]  # cm — 가깝/중간/먼 작업자
-    labels = [f"작업자{i+1}\n({d}cm)" for i, d in enumerate(distances)]
+    distances = [600, 1100, 1800]  # mm — 가깝/중간/먼 작업자 (레일상 거리)
+    labels = [f"작업자{i+1}\n({d}mm)" for i, d in enumerate(distances)]
 
     nearest = run("nearest", distances)
     priority = run("priority", distances)
 
-    print("상황: 작업자 3명 (거리 60 / 110 / 180 cm), 10분(600s) 송풍\n")
+    print("상황: 작업자 3명 (레일상 거리 600 / 1100 / 1800 mm), 10분(600s) 송풍\n")
     print(f"{'방식':<20} | {'인당 송풍시간(s)':<24} | {'편차%':>6}")
     print("-" * 58)
     print(f"{'가장 가까운 사람만':<18} | {str([round(x) for x in nearest]):<24} | {_spread_pct(nearest):>5.1f}%")
@@ -92,8 +92,8 @@ def _plot(labels, nearest, priority) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plt.rcParams["font.family"] = "AppleGothic"
-    plt.rcParams["axes.unicode_minus"] = False
+    from _plot_style import set_korean_font
+    set_korean_font(plt)
 
     x = range(len(labels))
     w = 0.38

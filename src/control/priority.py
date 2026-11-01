@@ -16,7 +16,7 @@
     - Cooldown      : 방금 송풍받은 대상은 일정 시간 후보에서 제외 → 바로 재선정 방지
     - 최소 유지시간 : 한 대상에게 최소 T초 송풍한 뒤 전환 → 캐리지 잦은 왕복 방지
 
-주의: distance_cm은 '팬 세기용 깊이'가 아니라 '캐리지에서 작업자까지 레일상 거리'.
+주의: distance_mm은 '팬 세기용 깊이'가 아니라 '캐리지에서 작업자까지 레일상 거리(mm)'.
       팬 세기(거리→PWM)는 별도 깊이 값으로 fan_control에서 처리한다.
 """
 
@@ -30,7 +30,7 @@ class Worker:
     """추적 중인 작업자 1명 (ID는 인식부 ByteTrack에서 부여)."""
 
     wid: int
-    distance_cm: float = 0.0     # 캐리지↔작업자 레일상 거리 (가까울수록 이동 적음)
+    distance_mm: float = 0.0     # 캐리지↔작업자 레일상 거리(mm) (가까울수록 이동 적음)
     cooled_total_s: float = 0.0  # 지금까지 누적 송풍받은 시간
     wait_s: float = 0.0          # 마지막 송풍 이후 대기 시간
     detected: bool = True        # 현재 프레임에 검출됐는지
@@ -68,4 +68,4 @@ def pick_target(
         return tier2[0]
 
     # 4) 3순위(또 동점): 캐리지에서 가까운 사람 → 캐리지 이동 최소(효율)
-    return min(tier2, key=lambda w: w.distance_cm)
+    return min(tier2, key=lambda w: w.distance_mm)

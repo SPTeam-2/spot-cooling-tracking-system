@@ -38,7 +38,7 @@ def run(total_s=600, dwell=8, seed=0):
                      pos[i] + rng.gauss(0, 15) + 0.05 * (BASE_X[i] - pos[i])))
         if current is None or dwell_left <= 0:
             for w in workers:
-                w.distance_cm = abs(pos[w.wid] - carriage)   # 캐리지 상대거리
+                w.distance_mm = abs(pos[w.wid] - carriage)   # 캐리지 상대거리(mm)
             target = pick_target(workers, t)
             if target is not current:
                 carriage = pos[target.wid]
@@ -81,8 +81,8 @@ def _plot(means, stds, dev_pct):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plt.rcParams["font.family"] = "AppleGothic"
-    plt.rcParams["axes.unicode_minus"] = False
+    from _plot_style import set_korean_font
+    set_korean_font(plt)
 
     labels = [f"작업자{i+1}" for i in range(N)]
     fig, ax = plt.subplots(figsize=(7, 4.6), dpi=150)

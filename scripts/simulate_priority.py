@@ -30,9 +30,9 @@ def run_sim(
     반환: 인당 누적 송풍시간, 편차 지표.
     """
     rng = random.Random(seed)
-    # 작업자별 거리는 서로 다르게(1~2m) 두어 거리 기준도 동작하게 함
+    # 작업자별 거리는 서로 다르게(약 0.4~2m) 두어 거리 기준도 동작하게 함
     workers = [
-        Worker(wid=i, distance_cm=rng.uniform(40, 200))
+        Worker(wid=i, distance_mm=rng.uniform(400, 2000))
         for i in range(n_workers)
     ]
 
