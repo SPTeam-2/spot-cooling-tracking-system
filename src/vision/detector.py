@@ -17,6 +17,7 @@ class PersonDetector:
     def from_config(cls, path="config/detector.yaml"):
         with open(path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
+            cfg.pop("tracker", None)  # 추적(PersonTracker) 전용 설정이라 검출기에서는 제외
         return cls(**cfg)
 
     def detect(self, frame):
