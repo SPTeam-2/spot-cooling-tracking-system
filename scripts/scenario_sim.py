@@ -71,7 +71,7 @@ def run(strategy, total_s=1200, min_dwell_s=8, seed=0):
                                if workers[(start + k) % n].detected), None)
             else:  # 우선순위(우리): 거리 = 캐리지에서의 레일상 거리(이동 최소)
                 for w in workers:
-                    w.distance_cm = abs(rail_x[w.wid] - carriage)
+                    w.distance_mm = abs(rail_x[w.wid] - carriage)
                 target = pick_target(workers, t)
 
             if target is not current:
@@ -136,8 +136,8 @@ def _plot(agg, total_s, n_seeds):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    plt.rcParams["font.family"] = "AppleGothic"
-    plt.rcParams["axes.unicode_minus"] = False
+    from _plot_style import set_korean_font
+    set_korean_font(plt)
 
     names = list(agg.keys())
     colors = ["#c9513b", "#8a8f99", "#2f7bbf"]  # 최근접=빨강, 라운드로빈=회색, 우리=파랑

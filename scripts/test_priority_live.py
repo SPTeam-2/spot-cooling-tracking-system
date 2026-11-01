@@ -93,10 +93,10 @@ def main():
             seen.append(d.track_id)
         smoother.end_frame(seen)
 
-        # 2) Worker 상태 갱신 (이름은 distance_cm이지만 레일 거리 mm를 넣음)
+        # 2) Worker 상태 갱신 (distance_mm = 캐리지↔작업자 레일상 거리 mm)
         for tid, w in workers.items():
             w.detected = (now - last_seen[tid]) < LOST_TIMEOUT_S
-            w.distance_cm = abs(rail_pos[tid] - carriage)
+            w.distance_mm = abs(rail_pos[tid] - carriage)
 
         # 3) 대상 선정 (최소 유지시간 끝났거나 대상이 사라지면)
         if target is None or dwell_left <= 0 or not target.detected:
