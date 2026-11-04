@@ -46,6 +46,7 @@ def integration_loop(link: PiLink):
     # from vision.tracker import PersonTracker
     # from coordinate.calibration import CoordinateTransformer
     # from control.priority import Worker, pick_target
+    # from control.depth import bbox_to_depth_mm, fuse_depth_mm
     # from fan.fan_control import distance_to_duty
     #
     # tracker = PersonTracker.from_config()
@@ -55,10 +56,11 @@ def integration_loop(link: PiLink):
     #     dets = tracker.track(frame)
     #     seen = []
     #     for d in dets:
-    #         _, rail_mm = transformer.transform(d.ref_point)
+    #         _, rail_mm = transformer.transform(d.ref_point)   # 레일 위치(좌우)
     #         w = workers.setdefault(d.track_id, Worker(wid=d.track_id))
-    #         w.distance_mm = abs(rail_mm - carriage_mm)
+    #         w.distance_mm = abs(rail_mm - carriage_mm)         # 캐리지 상대거리(선정용)
     #         w._rail_mm = rail_mm
+    #         w._bbox_h = d.bbox[3] - d.bbox[1]                  # 박스 높이(깊이 추정용)
     #         seen.append(d.track_id)
     #     for tid, w in workers.items():
     #         w.detected = tid in seen
@@ -67,8 +69,9 @@ def integration_loop(link: PiLink):
     #     if target is None:
     #         link.send(carriage_mm, 0, active=False)
     #     else:
-    #         # 팬 세기는 레일거리가 아니라 작업자 깊이(cm)로 — 인식부/초음파가 제공
-    #         duty = distance_to_duty(target.depth_cm)
+    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)'로 — 카메라 bbox(주) + 초음파(보조)
+    #         depth_mm = fuse_depth_mm(bbox_to_depth_mm(target._bbox_h), sonar_mm=None)
+    #         duty = distance_to_duty(depth_mm)
     #         carriage_mm = target._rail_mm
     #         link.send(carriage_mm, duty, active=True)
 
