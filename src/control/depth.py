@@ -25,11 +25,12 @@ def fuse_depth_mm(cam_mm: float, sonar_mm: float | None = None, *,
                   max_gap_mm: float = 400.0) -> float:
     """카메라 깊이(주) + 초음파(보조) 융합.
 
-    둘이 크게 어긋나면(박스 추정이 틀어졌다고 보고) 실측 초음파를 쓰고,
-    가까우면 평균으로 안정화. 초음파 값이 없으면 카메라 값 그대로.
+    카메라가 '사람 위치·대략 거리'를 신뢰값으로 잡는다. 초음파가 그와 비슷하면
+    평균으로 미세보정하고, 크게 어긋나면(초음파가 벽·사물을 쟀다고 보고) 버린다.
+    초음파 값이 없으면 카메라 값 그대로.
     """
     if sonar_mm is None:
         return cam_mm
     if abs(cam_mm - sonar_mm) > max_gap_mm:
-        return sonar_mm
+        return cam_mm
     return (cam_mm + sonar_mm) / 2
