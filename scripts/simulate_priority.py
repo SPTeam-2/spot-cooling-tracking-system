@@ -1,7 +1,4 @@
-"""우선순위 알고리즘 시뮬레이션 (하드웨어 없이 성능 측정)
-
-가상 작업자 N명을 두고 우선순위 알고리즘으로 송풍 대상을 번갈아 선정하며,
-"인당 누적 송풍시간 편차 %"를 계산한다. (보고서 성능지표: 편차 20% 이내 목표)
+"""우선순위 알고리즘 시뮬레이션 — 인당 누적 송풍시간 편차%를 측정(목표 20% 이내).
 
 실행:  python3 scripts/simulate_priority.py
 """
@@ -13,7 +10,6 @@ import random
 import statistics
 import sys
 
-# 로직 모듈(src/control/priority.py) import 경로 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "control"))
 from priority import Worker, pick_target
 
@@ -25,13 +21,9 @@ def run_sim(
     cooldown_s: float = 5.0,
     seed: int = 0,
 ) -> dict:
-    """N명이 통로에 있는 상황을 total_s초 동안 1초 단위로 시뮬레이션.
-
-    반환: 인당 누적 송풍시간, 편차 지표.
-    """
+    """N명이 통로에 있는 상황을 total_s초 동안 1초 단위로 시뮬레이션."""
     rng = random.Random(seed)
-    # 작업자별 거리는 서로 다르게(약 0.4~2m) 두어 거리 기준도 동작하게 함
-    workers = [
+    workers = [  # 거리를 0.4~2m로 다르게 둬 거리 기준도 동작시킴
         Worker(wid=i, distance_mm=rng.uniform(400, 2000))
         for i in range(n_workers)
     ]
@@ -40,7 +32,6 @@ def run_sim(
     dwell_left = 0.0
 
     for t in range(total_s):
-        # 최소 유지시간이 남아있으면 현재 대상 유지, 아니면 재선정
         if current is None or dwell_left <= 0:
             target = pick_target(workers, now=t)
             if target is not current and target is not None:
@@ -51,20 +42,18 @@ def run_sim(
 
         for w in workers:
             if w is target:
-                w.cooled_total_s += 1      # 송풍 1초
+                w.cooled_total_s += 1
                 w.wait_s = 0
             else:
-                w.wait_s += 1              # 나머지는 대기 누적
+                w.wait_s += 1
 
         if target is not None:
             dwell_left -= 1
-            # 유지시간 끝나면 그 대상 Cooldown 부여 (바로 재선정 방지)
             if dwell_left <= 0:
-                target.cooldown_until = t + cooldown_s
+                target.cooldown_until = t + cooldown_s  # 바로 재선정 방지
 
     cooled = [w.cooled_total_s for w in workers]
     mean = statistics.mean(cooled)
-    # 편차% = (최대-최소)/평균 × 100  (보고서 지표 정의와 맞춤)
     spread_pct = (max(cooled) - min(cooled)) / mean * 100 if mean else 0.0
     return {
         "n": n_workers,

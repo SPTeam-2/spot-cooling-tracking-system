@@ -1,11 +1,6 @@
-"""송풍 분배 전략 비교 시뮬레이션 
-같은 상황(작업자 3명, 서로 다른 거리)에서 두 방식을 비교한다.
+"""송풍 분배 전략 비교 — 작업자 3명(거리 다름)에서 두 방식의 공정성 편차% 대조.
 
-  (A) 가장 가까운 사람만 송풍  — 단순 방식(베이스라인)
-  (B) 우선순위 알고리즘        — 누적송풍→대기→거리 (우리 방식)
-
-목적: "단순 추적/최근접"이 아니라 '다인원 공정 분배'가 핵심 기여임을 수치로 보여줌.
-결과를 콘솔 표 + 막대그래프(PNG)로 출력 → 캡스톤 신청서 근거자료로 사용.
+(A) 최근접만(베이스라인) vs (B) 우선순위(누적→대기→거리). 콘솔 표 + 막대그래프(PNG).
 
 실행:  python3 scripts/compare_strategies.py
 """
@@ -28,12 +23,7 @@ def _spread_pct(vals: list[float]) -> float:
 
 
 def run(strategy: str, distances_mm, total_s=600, min_dwell_s=8.0, cooldown_s=5.0):
-    """3명 고정 거리 상황을 total_s초간 1초 단위로 시뮬레이션.
-
-    strategy="nearest" : 매 순간 가장 가까운 사람 (공정성 고려 X)
-    strategy="priority": 우리 우선순위 알고리즘
-    반환: 인당 누적 송풍시간 리스트
-    """
+    """고정 거리 상황을 1초 단위로 시뮬레이션. strategy: "nearest" | "priority"."""
     workers = [Worker(wid=i, distance_mm=d) for i, d in enumerate(distances_mm)]
     current: Worker | None = None
     dwell_left = 0.0

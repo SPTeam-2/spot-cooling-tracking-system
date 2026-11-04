@@ -1,10 +1,6 @@
-"""송풍 출력 제어
+"""송풍 출력 제어 — 거리(cm) → 팬 PWM 세기(%) 매핑 + GPIO PWM 구동.
 
-거리(cm) → 팬 PWM 세기(%) 3단계 매핑 + 실제 GPIO PWM 제어.
-멀수록 강풍, 가까우면 미풍. 경계 떨림 방지를 위한 히스테리시스 포함.
-
-- distance_to_duty(): 순수 로직 → 하드웨어 없이 단독 테스트 가능
-- FanController       : RPi.GPIO로 MOSFET(D4184) PWM 제어 (파이에서만 동작)
+distance_to_duty()는 순수 로직(단독 테스트 가능), FanController는 파이에서만 동작.
 """
 
 from __future__ import annotations
