@@ -1,18 +1,8 @@
-"""현실 시나리오 기반 송풍 분배 전략 비교 (통합부 / 김선형)
+"""현실 시나리오(작업자 4명 이동+입출입) 송풍 분배 전략 비교.
 
-작업자 4명이 레일을 따라 서로 다른 위치에서 일하며 매초 조금씩 이동하고,
-가끔 자리를 비웠다 복귀한다(휴식·자재 이동). 이 현실적 상황에서 세 전략을 비교:
-
-  (1) 단순 최근접  : 매번 캐리지에서 가장 가까운 사람 (분배 개념 없음)
-  (2) 라운드로빈   : 정해진 순서대로 공평하게 돌림 (거리 완전 무시)
-  (3) 우선순위     : 누적 송풍 적은 사람 우선 + 비슷하면 가까운 사람 (우리 방식)
-
-세 지표로 평가(모두 "낮을수록 좋음"):
-  - 공정성(편차%)     : 재실(在室)시간 대비 송풍시간 비율의 편차 → 0에 가까울수록 공정
-  - 캐리지 이동거리(mm): 캐리지가 레일을 왕복한 총 거리 → 작을수록 효율(모터부하·전력·소음↓)
-  - 최대 대기시간(s)   : 자리에 있는데 송풍 못 받고 가장 오래 기다린 시간
-
-난수 시드 여러 개로 반복해 평균±표준편차로 집계(특정 케이스 편향 방지).
+세 전략(단순 최근접 / 라운드로빈 / 우선순위)을 세 지표로 평가(모두 낮을수록 좋음):
+공정성 편차%(재실시간 대비 송풍 비율), 캐리지 이동거리(mm), 최대 대기시간(s).
+난수 시드 여러 개 평균±표준편차로 집계.
 
 실행:  python3 scripts/scenario_sim.py
 """
@@ -47,7 +37,7 @@ def run(strategy, total_s=1200, min_dwell_s=8, seed=0):
     last_id = None
 
     for t in range(total_s):
-        # 1) 이동 + 입출입
+        # 매초 이동 + 가끔 자리 비움/복귀
         for i, w in enumerate(workers):
             if absent_left[i] > 0:
                 absent_left[i] -= 1
@@ -58,7 +48,7 @@ def run(strategy, total_s=1200, min_dwell_s=8, seed=0):
             rail_x[i] = max(50.0, min(750.0,
                         rail_x[i] + rng.gauss(0, 15) + 0.05 * (BASE_X[i] - rail_x[i])))
 
-        # 2) 대상 선정 (유지시간 끝났거나 대상이 사라지면 재선정)
+        # 유지시간 끝났거나 대상이 사라지면 재선정
         if current is None or dwell_left <= 0 or not current.detected:
             cands = [w for w in workers if w.detected]
             if not cands:
@@ -69,7 +59,7 @@ def run(strategy, total_s=1200, min_dwell_s=8, seed=0):
                 start = (last_id + 1) if last_id is not None else 0
                 target = next((workers[(start + k) % n] for k in range(n)
                                if workers[(start + k) % n].detected), None)
-            else:  # 우선순위(우리): 거리 = 캐리지에서의 레일상 거리(이동 최소)
+            else:  # 우선순위: 거리 = 캐리지 상대 레일거리(이동 최소)
                 for w in workers:
                     w.distance_mm = abs(rail_x[w.wid] - carriage)
                 target = pick_target(workers, t)
@@ -84,7 +74,6 @@ def run(strategy, total_s=1200, min_dwell_s=8, seed=0):
         else:
             target = current
 
-        # 3) 송풍/대기/재실 누적, 캐리지는 대상 따라 미세 추종
         for w in workers:
             if w.detected:
                 present_s[w.wid] += 1
