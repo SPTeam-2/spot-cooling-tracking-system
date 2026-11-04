@@ -1,4 +1,4 @@
-"""송풍 출력 제어 — 거리(cm) → 팬 PWM 세기(%) 매핑 + GPIO PWM 구동.
+"""송풍 출력 제어 — 작업자 깊이(mm) → 팬 PWM 세기(%) 매핑 + GPIO PWM 구동.
 
 distance_to_duty()는 순수 로직(단독 테스트 가능), FanController는 파이에서만 동작.
 """
@@ -7,33 +7,33 @@ from __future__ import annotations
 
 
 def distance_to_duty(
-    dist_cm: float,
+    dist_mm: float,
     prev_duty: int | None = None,
     *,
-    near_max_cm: float = 50,
-    mid_max_cm: float = 120,
+    near_max_mm: float = 500,
+    mid_max_mm: float = 1200,
     duty_near: int = 40,
     duty_mid: int = 70,
     duty_far: int = 100,
-    hysteresis_cm: float = 5,
+    hysteresis_mm: float = 50,
 ) -> int:
-    """거리(cm) → PWM 세기(%). 미풍 / 약풍 / 강풍 3단계.
+    """깊이(mm) → PWM 세기(%). 미풍 / 약풍 / 강풍 3단계.
 
     prev_duty를 주면 경계에서의 잦은 단계 전환(떨림)을 히스테리시스로 억제.
     """
-    near = near_max_cm
-    mid = mid_max_cm
+    near = near_max_mm
+    mid = mid_max_mm
     # 이전 단계보다 더 강한 단계로 올라갈 땐 경계를 조금 더 멀리 둔다 (올라가기 어렵게)
     if prev_duty is not None:
         if prev_duty <= duty_near:
-            near += hysteresis_cm
-            mid += hysteresis_cm
+            near += hysteresis_mm
+            mid += hysteresis_mm
         elif prev_duty <= duty_mid:
-            mid += hysteresis_cm
+            mid += hysteresis_mm
 
-    if dist_cm <= near:
+    if dist_mm <= near:
         return duty_near
-    if dist_cm <= mid:
+    if dist_mm <= mid:
         return duty_mid
     return duty_far
 

@@ -33,14 +33,14 @@ stepper:
   pulley_teeth: 20        # 20T → 1회전당 40mm 이동
   # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 3200 = 0.0125
 
-# 거리(cm) → 송풍 세기 3단계 (멀수록 강풍)
+# 깊이(mm) → 송풍 세기 3단계 (멀수록 강풍)
 fan_power:
-  near_max_cm: 50         # ≤50cm  → 미풍
-  mid_max_cm: 120         # 50~120 → 약풍
+  near_max_mm: 500        # ≤500mm   → 미풍
+  mid_max_mm: 1200        # 500~1200 → 약풍
   duty_near: 40           # 미풍 (%) — 하한(이 이하면 팬 안 돎)
   duty_mid: 70            # 약풍
   duty_far: 100           # 강풍
-  hysteresis_cm: 5        # 구간 경계 떨림 방지
+  hysteresis_mm: 50       # 구간 경계 떨림 방지
 
 # 제어 로직 파라미터
 control:
