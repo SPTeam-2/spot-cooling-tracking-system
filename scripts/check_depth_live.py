@@ -59,11 +59,12 @@ def main():
         for d in tracker.track(frame):
             x1, y1, x2, y2 = d.bbox
             h, w = y2 - y1, x2 - x1
-            depth_h = bbox_to_depth_mm(h)   # 높이 기준 깊이(mm)
+            depth_h = bbox_to_depth_mm(h)   # 높이 기준 (비교용)
+            depth_w = bbox_to_depth_mm(w)   # 폭 기준 (실제 사용)
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, f"h={h}px  w={w}px", (x1, max(y1 - 32, 18)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(frame, f"depth(h)={depth_h:.0f}mm", (x1, max(y1 - 8, 40)),
+            cv2.putText(frame, f"depth  h={depth_h:.0f}  w={depth_w:.0f}mm", (x1, max(y1 - 8, 40)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
 
         cv2.imshow(win, frame)
