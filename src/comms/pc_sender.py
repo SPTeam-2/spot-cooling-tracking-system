@@ -43,26 +43,27 @@ def integration_loop(link: PiLink):
     """실제 통합 뼈대 (카메라·부품 준비 후 아래 패턴대로 구현)."""
     raise NotImplementedError
 
-    # from vision.tracker import PersonTracker
-    # from coordinate.calibration import CoordinateTransformer
+    # import cv2
+    # from vision.perception import Perception       # 인식부(이예은, PR #10)
     # from control.priority import Worker, pick_target
     # from control.depth import bbox_to_depth_mm, fuse_depth_mm
     # from fan.fan_control import distance_to_duty
     #
-    # tracker = PersonTracker.from_config()
-    # transformer = CoordinateTransformer.from_config()
+    # perception = Perception.from_config()
+    # cap = cv2.VideoCapture(0)
     # workers, carriage_mm = {}, 300.0
     # while True:
-    #     dets = tracker.track(frame)
+    #     ok, frame = cap.read()
+    #     if not ok:
+    #         break
+    #     obs = perception.update(frame)    # [WorkerObs(track_id, rail_mm, bbox)]
     #     seen = []
-    #     for d in dets:
-    #         _, rail_mm = transformer.transform(d.ref_point)   # 레일 위치(좌우)
-    #         w = workers.setdefault(d.track_id, Worker(wid=d.track_id))
-    #         w.distance_mm = abs(rail_mm - carriage_mm)         # 캐리지 상대거리(선정용)
-    #         w._rail_mm = rail_mm
-    #         # 깊이용 크기 = 박스 폭(어깨너비): 전신 높이는 앉음/하체 가림에 약해 폭 사용
-    #         w._size_px = d.bbox[2] - d.bbox[0]
-    #         seen.append(d.track_id)
+    #     for o in obs:
+    #         w = workers.setdefault(o.track_id, Worker(wid=o.track_id))
+    #         w.distance_mm = abs(o.rail_mm - carriage_mm)   # 캐리지 상대거리(선정용)
+    #         w._rail_mm = o.rail_mm
+    #         w._size_px = o.bbox[2] - o.bbox[0]             # 깊이용 = 박스 폭(어깨너비)
+    #         seen.append(o.track_id)
     #     for tid, w in workers.items():
     #         w.detected = tid in seen
     #
@@ -70,11 +71,10 @@ def integration_loop(link: PiLink):
     #     if target is None:
     #         link.send(carriage_mm, 0, active=False)
     #     else:
-    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)'로 — 카메라 크기(주) + 초음파(보조)
+    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)' — 카메라 폭(주) + 초음파(보조)
     #         depth_mm = fuse_depth_mm(bbox_to_depth_mm(target._size_px), sonar_mm=None)
     #         duty = distance_to_duty(depth_mm)
-    #         # carriage_mm은 추정값(단방향이라 실제 위치 피드백 없음). 3순위 선정에만 쓰여 영향 작음
-    #         carriage_mm = target._rail_mm
+    #         carriage_mm = target._rail_mm   # 추정값(단방향, 위치 피드백 없음). 3순위 선정만 영향
     #         link.send(carriage_mm, duty, active=True)
 
 
