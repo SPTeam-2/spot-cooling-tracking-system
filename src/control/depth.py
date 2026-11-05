@@ -1,24 +1,30 @@
-"""작업자 깊이(앞뒤 거리, mm) 추정 — 카메라 bbox 높이 기반, 초음파는 보조.
+"""작업자 깊이(앞뒤 거리, mm) 추정 — 카메라 박스 크기 기반, 초음파는 보조.
 
-핀홀 모델에서 깊이 ∝ 1 / 박스높이(px) → 기준점 하나로 보정해 역산한다.
+핀홀 모델에서 깊이 ∝ 1 / 박스크기(px) → 기준점 하나로 보정해 역산한다.
 박스는 '사람'에만 잡히므로 벽·사물을 거리로 오인하지 않는다(초음파 약점 보완).
+
+크기(size_px)는 '가림에 강한 치수'를 넣는다 — 상체 높이나 어깨 폭 등.
+전신 높이는 랙에 하체가 가리면 작아져 '멀다'고 오판하므로 피한다.
 """
 
 from __future__ import annotations
 
-# 보정 기준: 깊이 REF_DEPTH_MM일 때 사람 박스 높이가 REF_BBOX_PX.
-# TODO: 실제 카메라로 아는 거리(예: 1m)에 사람 세워 박스 높이 측정해 갱신.
+# 보정 기준: 깊이 REF_DEPTH_MM일 때 사람 박스 크기가 REF_SIZE_PX.
+# TODO: 실제 카메라로 아는 거리(예: 1m)에 사람 세워 박스 크기 측정해 갱신.
 REF_DEPTH_MM = 1000.0
-REF_BBOX_PX = 500.0
+REF_SIZE_PX = 500.0
 
 
-def bbox_to_depth_mm(bbox_h_px: float, *,
+def bbox_to_depth_mm(size_px: float, *,
                      ref_depth_mm: float = REF_DEPTH_MM,
-                     ref_bbox_px: float = REF_BBOX_PX) -> float:
-    """사람 박스 높이(px) → 깊이(mm). 박스 클수록(가까울수록) 깊이 작아짐."""
-    if bbox_h_px <= 0:
+                     ref_size_px: float = REF_SIZE_PX) -> float:
+    """사람 박스 크기(px) → 깊이(mm). 크기 클수록(가까울수록) 깊이 작아짐.
+
+    size_px: 가림에 강한 치수(상체 높이/어깨 폭 등). ref_*도 같은 치수로 보정할 것.
+    """
+    if size_px <= 0:
         return float("inf")
-    return ref_depth_mm * ref_bbox_px / bbox_h_px
+    return ref_depth_mm * ref_size_px / size_px
 
 
 def fuse_depth_mm(cam_mm: float, sonar_mm: float | None = None, *,

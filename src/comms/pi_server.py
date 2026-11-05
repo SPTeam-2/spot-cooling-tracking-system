@@ -34,7 +34,7 @@ class Actuators:
     def __init__(self):
         rail = _cfg.get("rail", {})
         st = _cfg.get("stepper", {})
-        self.travel_mm = rail.get("travel_mm", 530)
+        self.travel_mm = rail.get("travel_mm", 530)   # TODO: 좌표부 rail_range와 실측 후 통일
         self.mm_per_step = (st.get("belt_pitch_mm", 2) * st.get("pulley_teeth", 20)) \
             / (st.get("steps_per_rev", 200) * st.get("microstep", 16))
         self.deadzone_mm = _cfg.get("control", {}).get("deadzone_mm", 20)

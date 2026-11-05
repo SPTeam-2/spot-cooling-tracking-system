@@ -13,9 +13,9 @@ from depth import bbox_to_depth_mm, fuse_depth_mm
 
 
 def main() -> None:
-    print("박스높이(px) → 깊이(mm)   [기준: 500px = 1000mm]")
-    for h in [1000, 700, 500, 350, 250, 150]:
-        print(f"  {h:>4}px → {bbox_to_depth_mm(h):>6.0f}mm")
+    print("박스크기(px) → 깊이(mm)   [기준: 500px = 1000mm]")
+    for s in [1000, 700, 500, 350, 250, 150]:
+        print(f"  {s:>4}px → {bbox_to_depth_mm(s):>6.0f}mm")
 
     print("\n초음파 보조 융합 (카메라 480mm 추정 가정):")
     for sonar in [None, 500.0, 1200.0]:

@@ -60,7 +60,8 @@ def integration_loop(link: PiLink):
     #         w = workers.setdefault(d.track_id, Worker(wid=d.track_id))
     #         w.distance_mm = abs(rail_mm - carriage_mm)         # 캐리지 상대거리(선정용)
     #         w._rail_mm = rail_mm
-    #         w._bbox_h = d.bbox[3] - d.bbox[1]                  # 박스 높이(깊이 추정용)
+    #         # 깊이용 크기: 전신 높이는 하체 가림에 약함 → 상체 높이/폭 등으로 교체 가능
+    #         w._size_px = d.bbox[3] - d.bbox[1]
     #         seen.append(d.track_id)
     #     for tid, w in workers.items():
     #         w.detected = tid in seen
@@ -69,9 +70,10 @@ def integration_loop(link: PiLink):
     #     if target is None:
     #         link.send(carriage_mm, 0, active=False)
     #     else:
-    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)'로 — 카메라 bbox(주) + 초음파(보조)
-    #         depth_mm = fuse_depth_mm(bbox_to_depth_mm(target._bbox_h), sonar_mm=None)
+    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)'로 — 카메라 크기(주) + 초음파(보조)
+    #         depth_mm = fuse_depth_mm(bbox_to_depth_mm(target._size_px), sonar_mm=None)
     #         duty = distance_to_duty(depth_mm)
+    #         # carriage_mm은 추정값(단방향이라 실제 위치 피드백 없음). 3순위 선정에만 쓰여 영향 작음
     #         carriage_mm = target._rail_mm
     #         link.send(carriage_mm, duty, active=True)
 
