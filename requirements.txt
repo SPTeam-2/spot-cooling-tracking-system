@@ -1,0 +1,10 @@
+# 환경 재현:
+#   conda create -n sensorpro python=3.11 -y
+#   conda activate sensorpro
+#   pip install -r requirements.txt
+
+pyyaml          # config/*.yaml 로드
+numpy           # 좌표 변환 등 수치 계산
+opencv-python   # 카메라 입출력 (cv2)
+ultralytics     # YOLO 사람 검출/추적 (torch 포함)
+matplotlib      # 시뮬레이션 그래프
