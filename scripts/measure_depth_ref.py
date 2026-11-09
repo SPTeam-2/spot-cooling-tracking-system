@@ -75,7 +75,7 @@ def main():
         k = statistics.mean(ks)
         spread = (max(ks) - min(ks)) / k * 100
         print(f"\n평균 거리×폭 = {k:.0f}  (편차 {spread:.0f}%)")
-        print(f"→ 선형님 depth.py에 REF_DEPTH_MM = 1000, REF_BBOX_PX = {k / 1000:.0f} 로 넣으면 됨")
+        print(f"→ 선형님 depth.py에 REF_DEPTH_MM = 1000, REF_SIZE_PX = {k / 1000:.0f} 로 넣으면 됨")
 
 
 if __name__ == "__main__":
