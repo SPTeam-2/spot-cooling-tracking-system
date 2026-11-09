@@ -39,7 +39,6 @@ def main():
             if w.shoulders:
                 (lx, ly), (rx, ry) = w.shoulders
                 cv2.line(frame, (lx, ly), (rx, ry), (0, 0, 255), 3)
-                cv2.circle(frame, ((lx + rx) // 2, (ly + ry) // 2), 6, (0, 0, 255), -1)
         cv2.imshow("test_perception (q: quit)", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
