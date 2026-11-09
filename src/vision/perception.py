@@ -96,5 +96,5 @@ class Perception:
             seen.append(d.track_id)
         self.pos_smoother.end_frame(seen)
         self.size_smoother.end_frame(seen)
-        self.shoulder_smoother.end_frame(seen_sh)
+        self.shoulder_smoother.end_frame(seen)
         return out
