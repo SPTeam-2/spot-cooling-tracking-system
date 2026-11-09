@@ -57,11 +57,21 @@ class PersonTracker:
         # 추적이 막 시작된 프레임에는 id가 없을 수 있음 → None
         ids = boxes.id.int().tolist() if boxes.id is not None else [None] * len(boxes)
 
+        # 포즈 모델이면 사람마다 관절 17개 (x, y, 확신도). 일반 모델이면 None
+        kps = results[0].keypoints
+        if kps is not None and kps.xy is not None:
+            kxy = kps.xy.tolist()
+            kcf = kps.conf.tolist() if kps.conf is not None else [[1.0] * len(k) for k in kxy]
+            keypoints = [[(x, y, c) for (x, y), c in zip(pts, cs)] for pts, cs in zip(kxy, kcf)]
+        else:
+            keypoints = [None] * len(boxes)
+
         detections = []
-        for xyxy, conf, tid in zip(boxes.xyxy.tolist(), boxes.conf.tolist(), ids):
+        for xyxy, conf, tid, kp in zip(boxes.xyxy.tolist(), boxes.conf.tolist(), ids, keypoints):
             x1, y1, x2, y2 = map(int, xyxy)
             ref = ((x1 + x2) // 2, int(y1 + (y2 - y1) * self.ref_y_ratio))
             detections.append(
-                Detection(bbox=(x1, y1, x2, y2), conf=float(conf), ref_point=ref, track_id=tid)
+                Detection(bbox=(x1, y1, x2, y2), conf=float(conf), ref_point=ref,
+                          track_id=tid, keypoints=kp)
             )
         return detections
