@@ -21,7 +21,9 @@ def main():
                                         os.path.join(ROOT, "config", "coordinate.yaml"))
     src = args.source
     cap = cv2.VideoCapture(int(src), cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY) if src.isdigit() else cv2.VideoCapture(src)
-
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
     n = 0
     while True:
         ok, frame = cap.read()
