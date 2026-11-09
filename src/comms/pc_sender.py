@@ -62,7 +62,8 @@ def integration_loop(link: PiLink):
     #         w = workers.setdefault(o.track_id, Worker(wid=o.track_id))
     #         w.distance_mm = abs(o.rail_mm - carriage_mm)   # 캐리지 상대거리(선정용)
     #         w._rail_mm = o.rail_mm
-    #         w._size_px = o.bbox[2] - o.bbox[0]             # 깊이용 = 박스 폭(어깨너비)
+    #         # 깊이용 크기: 어깨 너비 우선(팔 동작에 강함), 없으면 박스 폭 대체
+    #         w._size_px = o.shoulder_px if o.shoulder_px is not None else o.width_px
     #         seen.append(o.track_id)
     #     for tid, w in workers.items():
     #         w.detected = tid in seen
