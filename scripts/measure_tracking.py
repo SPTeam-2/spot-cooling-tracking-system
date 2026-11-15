@@ -51,8 +51,8 @@ def main():
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
     model = YOLO(a.model)
-    relinker = IdRelinker(max_gap_frames=a.relink_gap, base_dist=a.relink_dist,
-                          dist_per_frame=a.relink_speed, max_dist=a.relink_max,
+    relinker = IdRelinker(max_gap=a.relink_gap, base_dist=a.relink_dist,
+                          dist_per_unit=a.relink_speed, max_dist=a.relink_max,
                           size_ratio=(0.5, 2.0), color_thresh=a.relink_color) if a.relink else None
     checker = SwapChecker(a.swap_dir, thresh=a.swap_thresh) if a.check_swap else None
     raw_life = Counter()  # 트래커 ID별 등장 프레임 수
