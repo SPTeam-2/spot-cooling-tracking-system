@@ -101,9 +101,7 @@ _state = {"cmd": Command(), "last_rx": 0.0}
 _lock = threading.Lock()
 
 
-def udp_receiver():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", PORT))
+def udp_receiver(sock: socket.socket):
     print(f"[파이] UDP {PORT} 수신 대기 ({'실장비' if ON_PI else '더미'})")
     while True:
         data, _ = sock.recvfrom(1024)
@@ -151,7 +149,12 @@ def main():
         act = Actuators()
     except Exception as e:
         sys.exit(f"[파이] GPIO 초기화 실패: {e}\n  하드웨어 없이 확인하려면 --dummy")
-    threading.Thread(target=udp_receiver, daemon=True).start()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.bind(("", PORT))
+    except OSError as e:
+        sys.exit(f"[파이] UDP {PORT} 포트를 열 수 없음: {e}\n  다른 pi_server가 이미 실행 중인지 확인")
+    threading.Thread(target=udp_receiver, args=(sock,), daemon=True).start()
     try:
         control_loop(act)
     except KeyboardInterrupt:
