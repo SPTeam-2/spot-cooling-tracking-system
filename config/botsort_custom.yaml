@@ -9,4 +9,4 @@ gmc_method: none          # 카메라 고정이라 카메라 움직임 보정 �
 proximity_thresh: 0.1
 appearance_thresh: 0.8
 with_reid: True           # 생김새로 이어붙이기
-model: auto
+model: yolo11n-cls.pt
