@@ -14,6 +14,7 @@ import importlib.util
 import io
 from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import Mock, patch
 
 path = Path(__file__).resolve().parents[1] / 'scripts' / 'run_stepper.py'
@@ -115,3 +116,58 @@ class RunnerTests(unittest.TestCase):
         with patch.object(runner.metadata, 'version', return_value='installed'):
             with self.assertRaisesRegex(RuntimeError, '함께 설치'):
                 runner.load_gpio()
+
+
+class TestConfigTests(unittest.TestCase):
+    """파일 조건·CLI 우선순위·무이동 기본값과 잘못된 YAML 차단 검사."""
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.profile = Path(directory.name) / 'test.yaml'
+        self.valid = 'direction: 1\nsteps: 1\nspeed: 10\nmax_speed: 20\npositive_dir_level: 0\n'
+        self.profile.write_text(self.valid, encoding='utf-8')
+
+    def parse(self, *args):
+        with contextlib.redirect_stderr(io.StringIO()):
+            return runner.parse_args(['--test-config', str(self.profile), *args])
+
+    def test_yaml_move_and_cli_override(self):
+        args = self.parse('--move')
+        self.assertEqual((args.direction, args.steps, args.speed, args.positive_dir_level), (1, 1, 10, 0))
+        self.assertEqual(self.parse('--move', '--direction', '-1').direction, -1)
+        with self.assertRaises(SystemExit):
+            self.parse('--move', '--speed', '21')
+
+    def test_configured_profile_without_move_never_enables(self):
+        args = self.parse()
+        gpio = Mock()
+        gpio.input.return_value = 1
+        hardware = Mock()
+        pins = {'stepper': {'step': 20, 'dir': 21, 'enable': 16}, 'limit_switch': {'left': 5, 'right': 6}}
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(runner.run(args, pins, gpio=gpio, hardware_factory=Mock(return_value=hardware)), 0)
+        hardware.enable.assert_not_called()
+        hardware.step_once.assert_not_called()
+
+    def test_null_profile_allows_preflight_only(self):
+        self.profile.write_text('direction: null\n', encoding='utf-8')
+        self.assertFalse(self.parse().move)
+        with self.assertRaises(SystemExit):
+            self.parse('--move')
+
+    def test_invalid_yaml_and_values(self):
+        cases = ['[]', 'direction: [', self.valid + 'move: true\n',
+                 self.valid.replace('steps: 1', 'steps: true'),
+                 self.valid.replace('steps: 1', 'steps: 1.5'),
+                 self.valid.replace('speed: 10', 'speed: .nan'),
+                 self.valid.replace('speed: 10', 'speed: 30'),
+                 self.valid.replace('positive_dir_level: 0', 'positive_dir_level: 2')]
+        for text in cases:
+            self.profile.write_text(text, encoding='utf-8')
+            with self.subTest(text=text), self.assertRaises(SystemExit):
+                self.parse('--move')
+
+    def test_missing_config_rejected(self):
+        self.profile.unlink()
+        with self.assertRaises(SystemExit):
+            self.parse('--move')

@@ -1,0 +1,14 @@
+# [파일 목적] Pi 현장 시험의 이동 조건을 한곳에서 관리
+# [흐름] 현장 값 입력 → run_stepper.py로 사전 확인 → --move로 한 번 이동
+# null은 미확정 값. 실제 이동 전 다섯 항목을 채워야 합니다.
+# 실행: python3 scripts/run_stepper.py --move
+# 후퇴: python3 scripts/run_stepper.py --move --direction -1
+# 명령줄 지정값이 우선하며, 변경 없이 재실행하려면 실제 사용값을 여기 기록하세요.
+# 핀은 pins.yaml, 벨트·풀리 사양은 coordinate.yaml에서 관리합니다.
+
+direction: null          # -1=모터 쪽, +1=모터에서 멀어지는 쪽
+steps: null              # 한 번 이동할 양의 정수 펄스 수
+speed: null              # 요청 속도 (steps/s)
+max_speed: null          # 현장에서 정한 속도 상한 (steps/s)
+positive_dir_level: null # +방향에 해당하는 DIR 신호 (0 또는 1), 짧은 시험으로 확인
+io_timeout: 0.25         # pigpiod 연결·명령 제한 시간(초), 정지거리 보장값 아님
