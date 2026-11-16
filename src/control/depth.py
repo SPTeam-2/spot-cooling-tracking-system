@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-# 보정 기준: 1000mm 거리에서 박스 폭 250px. 실측 후 갱신 필요.
+# 보정 기준: 1000mm 거리에서 어깨 너비 343px (1280x720, 3.34/4.34/5.34m 실측 평균, 편차 4%)
 REF_DEPTH_MM = 1000.0
-REF_SIZE_PX = 250.0
+REF_SIZE_PX = 343.0
 
 
 def bbox_to_depth_mm(size_px: float, *,

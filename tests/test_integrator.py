@@ -8,10 +8,15 @@ from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.control.depth import REF_DEPTH_MM, REF_SIZE_PX
 from src.control.integrator import Integrator
 
 
-def person(tid, rail_mm, shoulder_px=250.0, width_px=400.0):
+def px_at(depth_mm):
+    return REF_DEPTH_MM * REF_SIZE_PX / depth_mm
+
+
+def person(tid, rail_mm, shoulder_px=px_at(1000.0), width_px=px_at(600.0)):
     return SimpleNamespace(track_id=tid, rail_mm=rail_mm, shoulder_px=shoulder_px, width_px=width_px)
 
 
@@ -32,14 +37,14 @@ class IntegratorTests(unittest.TestCase):
         self.assertEqual((duty, active), (0, False))
 
     def test_target_position_and_duty_by_depth(self):
-        for shoulder, duty in ((600.0, 40), (250.0, 70), (100.0, 100)):   # 417 / 1000 / 2500mm
-            with self.subTest(shoulder=shoulder):
+        for depth, duty in ((400.0, 40), (1000.0, 70), (2500.0, 100)):
+            with self.subTest(depth=depth):
                 integ = Integrator({})
-                self.assertEqual(integ.step([person(1, 123.0, shoulder)], 0.0), (123.0, duty, True))
+                self.assertEqual(integ.step([person(1, 123.0, px_at(depth))], 0.0), (123.0, duty, True))
 
     def test_width_used_when_shoulder_missing(self):
-        self.integ.step([person(1, 300.0, shoulder_px=None, width_px=250.0)], 0.0)
-        self.assertEqual(self.integ.depth_mm, 1000.0)
+        self.integ.step([person(1, 300.0, shoulder_px=None, width_px=px_at(1000.0))], 0.0)
+        self.assertAlmostEqual(self.integ.depth_mm, 1000.0)
 
     def test_single_person_never_dropped_by_cooldown(self):
         out = self.run_for(30, [person(1, 300.0)])
