@@ -1,11 +1,8 @@
 """
-트래커 raw ID -> 안정 ID 재연결
-- 트래커가 새 ID를 붙여도, 최근에 사라진 ID가 근처에 있었고 옷 색이 비슷하면 그 ID를 이어서 씀
-- 거리 기준은 '박스 높이' 배수라서 사람이 크게/작게 보여도 같은 기준으로 동작
-- 잠깐 깜빡인 가짜 ID(min_life 회 미만 관측)는 이어받을 후보에서 제외
-- 시간 단위는 update()에 넘기는 t 와 같음
-    측정 스크립트: t = 프레임 번호 → max_gap, dist_per_unit 도 '프레임' 기준
-    perception   : t = 초(time.monotonic) → max_gap, dist_per_unit 도 '초' 기준 (FPS가 바뀌어도 같은 동작)
+트래커 ID → 안정 ID 재연결
+- 새 ID가 생기면, 최근 사라진 ID 중 가깝고 옷 색이 비슷한 것을 이어서 씀
+- 처음 보는 사람은 confirm_n 프레임 연속으로 잡혀야 번호를 줌 (깜빡인 박스 제외)
+- 시간 단위는 update()의 t를 따름
 """
 import math
 
@@ -32,7 +29,8 @@ def color_hist(frame, box):
 
 class IdRelinker:
     def __init__(self, max_gap=90, base_dist=0.5, dist_per_unit=0.03,
-                 max_dist=2.0, size_ratio=(0.6, 1.6), min_life=15, color_thresh=0.5):
+                 max_dist=2.0, size_ratio=(0.6, 1.6), min_life=15, color_thresh=0.5,
+                 confirm_n=3):
         self.max_gap = max_gap               # 사라진 지 이 시간(t 단위) 이내만 재연결 후보
         self.base_dist = base_dist           # 기본 허용 거리 (박스 높이 배수)
         self.dist_per_unit = dist_per_unit   # 사라진 시간(t 단위)만큼 허용 거리 증가
@@ -40,6 +38,8 @@ class IdRelinker:
         self.size_ratio = size_ratio         # 박스 높이 비율 허용 범위
         self.min_life = min_life             # 이 횟수 이상 관측된 ID만 이어받기 후보
         self.color_thresh = color_thresh     # 색 차이(0=같음, 1=다름)가 이보다 작아야 재연결
+        self.confirm_n = confirm_n           # 새 사람은 이 프레임 연속으로 잡혀야 번호 부여
+        self.pending = {}                    # 아직 번호 없는 트래커 ID -> 연속으로 잡힌 횟수
         self.raw2stable = {}                 # 트래커 ID -> 안정 ID
         self.last = {}                       # 안정 ID -> (t, cx, cy, h)
         self.life = {}                       # 안정 ID -> 등장 프레임 수
@@ -49,7 +49,8 @@ class IdRelinker:
         self.color_rejected = 0              # 위치는 맞는데 색이 달라서 거절한 횟수
 
     def update(self, t, raw_ids, boxes_xyxy, frame=None):
-        """t(프레임 번호 또는 초)와 raw_ids, boxes_xyxy를 받아 같은 순서로 안정 ID 리스트를 돌려줌. frame을 주면 색 비교도 함"""
+        """t(프레임 번호 또는 초)와 raw_ids, boxes_xyxy를 받아 같은 순서로 안정 ID 리스트를 돌려줌.
+        아직 확정 안 된 새 사람은 None. frame을 주면 색 비교도 함"""
         out = [None] * len(raw_ids)
         used = set()
         geo = [((x1 + x2) / 2, (y1 + y2) / 2, max(y2 - y1, 1)) for (x1, y1, x2, y2) in boxes_xyxy]
@@ -89,17 +90,29 @@ class IdRelinker:
                         continue
                 if d < best_d:
                     best, best_d = sid, d
-            if best is None:
+            rid = raw_ids[k]
+            if best is not None:                       # 사라졌던 사람 → 바로 원래 번호
+                self.relinked += 1
+                self.pending.pop(rid, None)
+            else:                                      # 처음 보는 사람 → 연속 confirm_n 프레임 확인
+                self.pending[rid] = self.pending.get(rid, 0) + 1
+                if self.pending[rid] < self.confirm_n:
+                    continue                           # 아직 확정 전: out[k] = None
+                del self.pending[rid]
                 best = self.next_id
                 self.next_id += 1
-            else:
-                self.relinked += 1
-            self.raw2stable[raw_ids[k]] = best
+            self.raw2stable[rid] = best
             out[k] = best
             used.add(best)
 
+        # 이번 프레임에 안 보인 확정 전 ID는 카운트 초기화 (연속으로 잡혀야 함)
+        seen_raw = set(raw_ids)
+        self.pending = {r: c for r, c in self.pending.items() if r in seen_raw}
+
         # 3) 위치·수명·색 갱신 + 오래된 기록 정리
         for k, sid in enumerate(out):
+            if sid is None:
+                continue
             self.last[sid] = (t, *geo[k])
             self.life[sid] = self.life.get(sid, 0) + 1
             if hists[k] is not None and self._isolated(k, geo):

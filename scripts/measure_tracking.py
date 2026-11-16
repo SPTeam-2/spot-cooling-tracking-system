@@ -2,11 +2,6 @@ r"""
 추적 ID 안정성 측정
 - 같은 영상에서 최종 ID 개수 / 오래 유지된 ID 개수 / FPS 를 출력
 - --relink 를 붙이면 트래커 ID를 IdRelinker로 재연결한 '안정 ID' 기준으로 측정
-- 사용 예:
-  python scripts\measure_tracking.py --source data\epfl_6p.avi --model models\yolo11n-pose.pt --conf 0.1 --tracker config\botsort_custom.yaml
-  python scripts\measure_tracking.py --source data\epfl_6p.avi --model models\yolo11n-pose.pt --conf 0.1 --tracker config\botsort_custom.yaml --relink
-  python scripts\measure_tracking.py --source data\epfl_6p.avi --model models\yolo11n-pose.pt --conf 0.1 --tracker config\botsort_custom.yaml --relink --show --delay 80
-  python scripts\measure_tracking.py --source data\epfl_6p.avi --model models\yolo11n-pose.pt --conf 0.1 --tracker config\botsort_custom.yaml --relink --check-swap
 """
 import argparse
 import os
@@ -35,6 +30,7 @@ def main():
     p.add_argument("--relink-speed", type=float, default=0.03, help="사라진 프레임당 허용 거리 증가")
     p.add_argument("--relink-max", type=float, default=2.0, help="허용 거리 상한")
     p.add_argument("--relink-color", type=float, default=0.5, help="옷 색 차이 허용치 (0~1, 작을수록 엄격). 1이면 색 비교 끔")
+    p.add_argument("--relink-confirm", type=int, default=3, help="새 사람은 이 프레임 연속으로 잡혀야 번호 부여")
     p.add_argument("--check-swap", action="store_true", help="ID 바꿔치기 의심 장면을 사진으로 저장")
     p.add_argument("--swap-dir", default="data/swap_check", help="의심 장면 사진 저장 폴더")
     p.add_argument("--swap-thresh", type=float, default=0.6, help="옷 색 차이가 이보다 크면 의심 (0~1)")
@@ -42,6 +38,7 @@ def main():
     p.add_argument("--show", action="store_true", help="화면 표시 (q 종료, 스페이스 일시정지)")
     p.add_argument("--delay", type=int, default=1, help="--show 때 프레임 간 대기(ms). 80~100이면 느리게")
     p.add_argument("--show-from", type=int, default=1, help="--show 때 이 프레임부터 화면 표시 (앞부분은 화면 없이 빠르게 처리)")
+    p.add_argument("--max-frames", type=int, default=0, help="이 프레임까지만 처리 (0이면 끝까지)")
     a = p.parse_args()
 
     src = int(a.source) if a.source.isdigit() else a.source
@@ -53,7 +50,8 @@ def main():
     model = YOLO(a.model)
     relinker = IdRelinker(max_gap=a.relink_gap, base_dist=a.relink_dist,
                           dist_per_unit=a.relink_speed, max_dist=a.relink_max,
-                          size_ratio=(0.5, 2.0), color_thresh=a.relink_color) if a.relink else None
+                          size_ratio=(0.5, 2.0), color_thresh=a.relink_color,
+                          confirm_n=a.relink_confirm) if a.relink else None
     checker = SwapChecker(a.swap_dir, thresh=a.swap_thresh) if a.check_swap else None
     raw_life = Counter()  # 트래커 ID별 등장 프레임 수
     life = Counter()      # 최종(표시되는) ID별 등장 프레임 수
@@ -65,6 +63,8 @@ def main():
 
     try:
         while True:
+            if a.max_frames and frames >= a.max_frames:
+                break
             ok, frame = cap.read()
             if not ok:
                 break
@@ -76,6 +76,8 @@ def main():
             raw_ids = [] if r.boxes.id is None else r.boxes.id.int().tolist()
             boxes = [] if r.boxes.id is None else r.boxes.xyxy.int().tolist()
             ids = relinker.update(frames, raw_ids, boxes, frame) if relinker else raw_ids
+            keep = [k for k, i in enumerate(ids) if i is not None]   # 확정 전 새 사람 제외
+            ids, boxes = [ids[k] for k in keep], [boxes[k] for k in keep]
             t_sum += time.perf_counter() - t0
             if checker:
                 checker.update(frames, frame, ids, boxes)

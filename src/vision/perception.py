@@ -4,7 +4,9 @@
 - track_id    : 안정 ID (통합부 Worker.wid)
                 트래커(BoT-SORT) ID를 IdRelinker로 재연결한 값.
                 가려졌다 다시 나타나도 같은 사람이면 같은 번호 유지 (#18)
+                처음 보는 사람은 몇 프레임 연속으로 잡혀야 전달 (깜빡인 가짜 박스 제외)
 - rail_mm     : 이동 평균된 레일 좌표(mm), 박스 상체 기준점(위에서 30%) 기준
+                가려져서 박스가 갑자기 반 이하로 작아지면 잠깐(HOLD_MAX 프레임) 이전 위치 유지
 - bbox        : (x1, y1, x2, y2) 이번 프레임 원본 박스(px)
 - width_px    : 이동 평균된 박스 폭(px)
 - height_px   : 이동 평균된 박스 높이(px)
@@ -30,6 +32,8 @@ from src.vision.tracker import PersonTracker
 
 L_SHOULDER, R_SHOULDER = 5, 6     # COCO 키포인트 번호
 KP_CONF_MIN = 0.5                 # 이 값보다 확신이 낮은 어깨는 안 쓴 것으로 처리
+SHRINK_RATIO = 0.5                # 박스 높이가 최근 평균의 이 비율 미만이면 '가려짐'으로 봄
+HOLD_MAX = 8                      # 가려짐일 때 이전 위치를 유지하는 최대 프레임 수
 
 
 @dataclass
@@ -66,6 +70,7 @@ class Perception:
         self.pos_smoother = TrackSmoother(window=window)        # (x_real, x_rail)
         self.size_smoother = TrackSmoother(window=window)       # (bbox 폭, bbox 높이)
         self.shoulder_smoother = TrackSmoother(window=window)   # (어깨 너비, 0)
+        self.hold = {}                                          # ID -> 가려짐으로 위치 유지한 연속 프레임 수
 
     @classmethod
     def from_config(cls, detector_cfg: str = "config/detector.yaml",
@@ -84,6 +89,7 @@ class Perception:
                     size_ratio=tuple(rc.get("size_ratio", [0.5, 2.0])),
                     min_life=rc.get("min_life", 8),
                     color_thresh=rc.get("color_thresh", 0.5),
+                    confirm_n=rc.get("confirm_n", 3),
                 )
         return cls(PersonTracker.from_config(detector_cfg),
                    CoordinateTransformer.from_config(coordinate_cfg),
@@ -103,13 +109,27 @@ class Perception:
             ids = raw_ids
 
         for d, tid in zip(dets, ids):
+            if tid is None:                                 # 아직 확정 안 된 새 사람 → 전달 안 함
+                continue
             x1, y1, x2, y2 = d.bbox
             sh = _shoulders(d)
 
-            # 레일 기준점: 박스 상체 기준점 (어깨 가운데는 몸 기울임에 더 흔들려서 사용 안 함)
-            x_real, x_rail = self.transformer.transform(d.ref_point)
-            _, s_rail = self.pos_smoother.update(tid, (x_real, x_rail))
-            s_w, s_h = self.size_smoother.update(tid, (x2 - x1, y2 - y1))
+            # 가려져서 박스가 갑자기 작아지면(상체 일부만 잡힘) 기준점이 튀므로 잠깐 이전 위치 유지
+            prev = self.size_smoother._hist.get(tid)
+            prev_h = sum(v[1] for v in prev) / len(prev) if prev else None
+            shrunk = prev_h is not None and (y2 - y1) < SHRINK_RATIO * prev_h
+            if shrunk and self.hold.get(tid, 0) < HOLD_MAX:
+                self.hold[tid] = self.hold.get(tid, 0) + 1
+                pos_hist = self.pos_smoother._hist[tid]
+                s_rail = sum(v[1] for v in pos_hist) / len(pos_hist)
+                s_w = sum(v[0] for v in prev) / len(prev)
+                s_h = prev_h
+            else:
+                self.hold[tid] = 0
+                # 레일 기준점: 박스 상체 기준점 (어깨 가운데는 몸 기울임에 더 흔들려서 사용 안 함)
+                x_real, x_rail = self.transformer.transform(d.ref_point)
+                _, s_rail = self.pos_smoother.update(tid, (x_real, x_rail))
+                s_w, s_h = self.size_smoother.update(tid, (x2 - x1, y2 - y1))
 
             s_sh = None
             if sh is not None:
@@ -129,4 +149,6 @@ class Perception:
         self.pos_smoother.end_frame(seen)
         self.size_smoother.end_frame(seen)
         self.shoulder_smoother.end_frame(seen)
+        for tid in [t for t in self.hold if t not in seen]:
+            del self.hold[tid]
         return out
