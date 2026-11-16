@@ -90,6 +90,7 @@ class Perception:
                     min_life=rc.get("min_life", 8),
                     color_thresh=rc.get("color_thresh", 0.5),
                     confirm_n=rc.get("confirm_n", 3),
+                    dup_wait=rc.get("duplicate_wait_s", 1.5),
                 )
         return cls(PersonTracker.from_config(detector_cfg),
                    CoordinateTransformer.from_config(coordinate_cfg),
