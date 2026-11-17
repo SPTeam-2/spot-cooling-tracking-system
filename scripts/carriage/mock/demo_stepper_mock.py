@@ -11,7 +11,7 @@ pigpio를 불러오거나 실제 GPIO를 구동하지 않음 / 레일 범위·�
 """
 from pathlib import Path
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from src.carriage.drive_geometry import DriveGeometry
 from src.carriage.function_limit_switch import LimitSwitchFunctions
 from src.carriage.function_stepper import StepperFunctions, StepperReason
