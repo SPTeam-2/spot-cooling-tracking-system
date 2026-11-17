@@ -20,7 +20,7 @@ from pathlib import Path
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 from src.carriage.function_limit_switch import LimitSwitchFunctions
 from src.carriage.function_stepper import StepperFunctions, StepperReason

@@ -5,7 +5,7 @@
 # 30ms 확인은 출력용 / 모터 정지 판단에 사용 금지 / 모터 구동 없음
 # [플로우 간단 정리]
 # 설정 읽기 → 객체 생성 → 상태 반복 읽기·변화 출력 → Ctrl+C 또는 오류 시 핀 정리
-"""입력 확인 전용 / 저장소 루트에서 python3 scripts/test_limit_switch.py 실행
+"""입력 확인 전용 / 저장소 루트에서 python3 scripts/carriage/pi/test_limit_switch.py 실행
 
 시작 상태와 30ms 이상 유지된 변화 출력 / 모터 구동 없음
 RPi.GPIO 기반 실행 / 실제 Pi 라이브러리 호환은 별도 확인 필요
@@ -20,7 +20,7 @@ import time
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 from src.carriage.hw_limit_switch import LimitSwitchHardware
 from src.carriage.function_limit_switch import LimitSwitchFunctions

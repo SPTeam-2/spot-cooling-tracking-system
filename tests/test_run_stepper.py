@@ -17,7 +17,7 @@ import unittest
 import tempfile
 from unittest.mock import Mock, patch
 
-path = Path(__file__).resolve().parents[1] / 'scripts' / 'run_stepper.py'
+path = Path(__file__).resolve().parents[1] / 'scripts' / 'carriage' / 'pi' / 'run_stepper.py'
 spec = importlib.util.spec_from_file_location('run_stepper', path)
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
