@@ -1,0 +1,23 @@
+# [테스트용] 팬틸트 서보 현장 시험 조건 — 실장비 확정값 아님
+# [파일 목적] Pi에서 run_pan_tilt.py로 서보 펄스 실측·각도 이동을 시험할 때 쓰는 값 관리
+# [흐름] --pulse로 중립·각도별 펄스 실측 → 값 입력 → 사전 확인 → --move로 중립 후 목표 각도 이동
+# null은 미확정 값. --move 실행 전 모든 항목을 채워야 함 (명령줄 --targets가 우선)
+# 실행: python3 scripts/pan_tilt/pi/run_pan_tilt.py --pulse pan 1500
+#       python3 scripts/pan_tilt/pi/run_pan_tilt.py --move --wait
+# 부품: pan(좌우) SG90 / tilt(상하) MG90S, 핀은 pins.yaml servo.pan·servo.tilt
+# 각도 기준: 0도 = 중립(팬이 정면), 펄스 = center_pulse_us + us_per_deg × 각도 (500~2500us 안)
+# 허용 범위는 #7-3 팬·브래킷·케이블 간섭 확인 후 결정
+
+pan:
+  center_pulse_us: null   # 0도일 때 펄스(us, 정수)
+  us_per_deg: null        # 1도당 펄스 변화량, 원하는 방향과 반대로 돌면 부호 반전
+  min_deg: null           # 허용 범위 시작 (0 이하)
+  max_deg: null           # 허용 범위 끝 (0 이상)
+tilt:
+  center_pulse_us: null
+  us_per_deg: null
+  min_deg: null
+  max_deg: null
+max_speed_deg_s: null     # 축별 최대 각속도(deg/s)
+targets_deg: null         # 차례대로 이동할 [pan, tilt] 목록, 예: [[20, 0], [-20, 10], [0, 0]]
+io_timeout: 0.25          # pigpiod 명령 제한 시간(초)
