@@ -12,7 +12,7 @@ real_points:
   - [0, 1500]     # 4. 시작점, 높이 1.5m
 
 real_range: [0, 2000]   # 실제 작업자 이동 범위 x (mm)
-rail_range: [0, 600]    # 레일 위 캐리지 이동 범위 (mm) — 임시값, 구동부 값 받으면 수정
+rail_range: [0, 530]    # 레일 위 캐리지 이동 범위 (mm) — rail.travel_mm과 같은 값, 실측 후 함께 갱신
 
 homography_file: data/calibration/homography.npz
 
