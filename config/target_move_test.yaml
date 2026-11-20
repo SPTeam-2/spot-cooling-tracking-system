@@ -1,0 +1,10 @@
+# [테스트용] 목표 위치 이동 현장 시험 조건 — 실장비 확정값 아님
+# [파일 목적] Pi에서 run_target_move.py로 Homing 후 목표 mm 이동을 시험할 때 쓰는 속도·목표 목록 관리
+# [흐름] 값 입력 → run_target_move.py로 사전 확인 → --move로 Homing 1회 + 목표 차례대로 이동
+# null은 미확정 값. --move 실행 전 두 항목을 모두 채워야 함 (명령줄 --speed·--targets가 우선)
+# 실행: python3 scripts/carriage/pi/run_target_move.py --move --wait
+# Homing 조건: homing_test.yaml / 방향·속도 상한·통신 제한: stepper_test.yaml
+# 목표 범위: coordinate.yaml rail.travel_mm (0mm = Homing 원점)
+
+speed_steps_s: null   # 목표 이동 속도(steps/s), stepper_test.yaml max_speed 이하
+targets_mm: null      # 차례대로 이동할 목표 목록(mm), 예: [50, 200, 100, 0]
