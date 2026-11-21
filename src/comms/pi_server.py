@@ -1,12 +1,13 @@
 """라즈베리파이 구동 서버 — 노트북 명령(UDP)을 받아 캐리지 이동 + 팬 제어.
 
-실행: python3 src/comms/pi_server.py
+실행: python3 src/comms/pi_server.py   (하드웨어 없이 확인: --dummy)
 GPIO가 없으면 더미 모드로 동작만 출력하므로 PC에서도 테스트된다.
 실제 모터·팬 GPIO는 # TODO 부분을 하드웨어 배선 후 채운다.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import socket
 import sys
@@ -31,7 +32,7 @@ except Exception:
 
 
 class Actuators:
-    def __init__(self):
+    def __init__(self, limits=None):
         rail = _cfg.get("rail", {})
         st = _cfg.get("stepper", {})
         self.travel_mm = rail.get("travel_mm", 530)   # TODO: 좌표부 rail_range와 실측 후 통일
@@ -42,13 +43,21 @@ class Actuators:
         self.current_mm = 0.0
         self.duty = 0
         self._fan = None
+        self._limits = limits      # 리미트 스위치 (구동부, PR #17)
+        self._limit_hw = None
+        self.fault = None          # 값이 있으면 재시작 전까지 이동·송풍 정지
         if ON_PI:
             self._init_gpio()
 
     def _init_gpio(self):
+        from carriage.function_limit_switch import LimitSwitchFunctions
+        from carriage.hw_limit_switch import LimitSwitchHardware
         from fan.fan_control import FanController
         pins = yaml.safe_load(open(os.path.join(_CFG_DIR, "pins.yaml")))
         self._fan = FanController(pins["fan"]["pwm"])
+        ls = pins["limit_switch"]
+        self._limit_hw = LimitSwitchHardware(ls["left"], ls["right"])
+        self._limits = LimitSwitchFunctions(self._limit_hw)
         # TODO: 스테퍼 STEP/DIR/EN 핀 초기화
 
     def set_fan(self, duty: int):
@@ -57,27 +66,42 @@ class Actuators:
             self._fan.set_duty(duty)
 
     def step_toward(self, target_mm: float, dt: float):
+        if self.fault:
+            return
         target_mm = max(0.0, min(self.travel_mm, target_mm))
         diff = target_mm - self.current_mm
         if abs(diff) <= self.deadzone_mm:
             return
         move = max(-self.max_speed_mm_s * dt, min(self.max_speed_mm_s * dt, diff))
+        direction = 1 if move > 0 else -1   # -1=왼쪽(원점 쪽), +1=오른쪽
+        if self._limits:
+            try:
+                if self._limits.is_blocked(direction):
+                    return
+            except Exception as e:
+                self.fault = f"리미트 스위치 읽기 실패: {e}"
+                return
         n_steps = int(abs(move) / self.mm_per_step)
-        self.current_mm += (1 if move > 0 else -1) * n_steps * self.mm_per_step
+        self.current_mm += direction * n_steps * self.mm_per_step
         if ON_PI:
-            pass  # TODO: DIR 세팅 후 STEP 핀 n_steps번 펄스
+            pass  # TODO: DIR 세팅 후 STEP 핀 n_steps번 펄스 (펄스 묶음마다 is_blocked 재확인)
 
     def stop(self):
         self.set_fan(0)
+
+    def close(self):
+        self.stop()
+        if self._fan:
+            self._fan.cleanup()
+        if self._limit_hw:
+            self._limit_hw.cleanup()
 
 
 _state = {"cmd": Command(), "last_rx": 0.0}
 _lock = threading.Lock()
 
 
-def udp_receiver():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", PORT))
+def udp_receiver(sock: socket.socket):
     print(f"[파이] UDP {PORT} 수신 대기 ({'실장비' if ON_PI else '더미'})")
     while True:
         data, _ = sock.recvfrom(1024)
@@ -99,27 +123,44 @@ def control_loop(act: Actuators, hz: int = 100):
             last_rx = _state["last_rx"]
         linked = bool(last_rx) and (time.time() - last_rx) < COMMS_TIMEOUT_S
 
-        if linked and cmd.active:
+        run = linked and cmd.active and not act.fault
+        if run:
             act.step_toward(cmd.target_mm, period)
+        if run and not act.fault:
             act.set_fan(cmd.fan_duty)
         else:
-            act.stop()   # 끊김 또는 대상 없음
+            act.stop()   # 끊김, 대상 없음, 또는 오류
 
         now = time.time()
         if now - last_log > 0.5:
-            tag = "연결" if linked else "끊김/대기"
+            tag = f"오류: {act.fault}" if act.fault else "연결" if linked else "끊김/대기"
             print(f"  [{tag}] 캐리지 {act.current_mm:6.1f}mm → {cmd.target_mm:6.1f}mm | 팬 {act.duty:>3}%")
             last_log = now
         time.sleep(period)
 
 
 def main():
-    act = Actuators()
-    threading.Thread(target=udp_receiver, daemon=True).start()
+    global ON_PI
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dummy", action="store_true", help="GPIO 없이 동작만 출력")
+    if ap.parse_args().dummy:
+        ON_PI = False
+    try:
+        act = Actuators()
+    except Exception as e:
+        sys.exit(f"[파이] GPIO 초기화 실패: {e}\n  하드웨어 없이 확인하려면 --dummy")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.bind(("", PORT))
+    except OSError as e:
+        sys.exit(f"[파이] UDP {PORT} 포트를 열 수 없음: {e}\n  다른 pi_server가 이미 실행 중인지 확인")
+    threading.Thread(target=udp_receiver, args=(sock,), daemon=True).start()
     try:
         control_loop(act)
     except KeyboardInterrupt:
-        act.stop()
+        pass
+    finally:
+        act.close()
 
 
 if __name__ == "__main__":
