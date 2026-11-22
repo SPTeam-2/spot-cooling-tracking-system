@@ -1,7 +1,7 @@
 """노트북 송신부 — 인식·판단 결과를 파이로 전송(UDP).
 
-실행(연결 테스트): python3 src/comms/pc_sender.py --host <파이IP> --demo
-실제 통합은 integration_loop() 패턴대로 매 프레임 link.send(...)를 호출한다.
+연결 테스트: python3 src/comms/pc_sender.py --host <파이IP> --demo
+실제 통합:   python3 src/comms/pc_sender.py --host <파이IP>   (카메라 사용, --source로 영상 파일 가능)
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ import socket
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, ROOT)
 from protocol import PORT, Command
 
 
@@ -39,44 +40,66 @@ def demo(link: PiLink, hz: int = 20):
         time.sleep(1.0 / hz)
 
 
-def integration_loop(link: PiLink):
-    """실제 통합 뼈대 (카메라·부품 준비 후 아래 패턴대로 구현)."""
-    raise NotImplementedError
+def integration_loop(link: PiLink, source: str = "0", show: bool = True):
+    """카메라 → 인식 → 대상 선정 → 깊이·팬 세기 → 파이 전송."""
+    import cv2
+    import yaml
+    from src.control.integrator import Integrator
+    from src.vision.perception import Perception
 
-    # import cv2
-    # from vision.perception import Perception       # 인식부(이예은, PR #10)
-    # from control.priority import Worker, pick_target
-    # from control.depth import bbox_to_depth_mm, fuse_depth_mm
-    # from fan.fan_control import distance_to_duty
-    #
-    # perception = Perception.from_config()
-    # cap = cv2.VideoCapture(0)
-    # workers, carriage_mm = {}, 300.0
-    # while True:
-    #     ok, frame = cap.read()
-    #     if not ok:
-    #         break
-    #     obs = perception.update(frame)    # [WorkerObs(track_id, rail_mm, bbox)]
-    #     seen = []
-    #     for o in obs:
-    #         w = workers.setdefault(o.track_id, Worker(wid=o.track_id))
-    #         w.distance_mm = abs(o.rail_mm - carriage_mm)   # 캐리지 상대거리(선정용)
-    #         w._rail_mm = o.rail_mm
-    #         # 깊이용 크기: 어깨 너비 우선(팔 동작에 강함), 없으면 박스 폭 대체
-    #         w._size_px = o.shoulder_px if o.shoulder_px is not None else o.width_px
-    #         seen.append(o.track_id)
-    #     for tid, w in workers.items():
-    #         w.detected = tid in seen
-    #
-    #     target = pick_target(list(workers.values()), now=time.time())
-    #     if target is None:
-    #         link.send(carriage_mm, 0, active=False)
-    #     else:
-    #         # 팬 세기는 레일거리가 아니라 '깊이(앞뒤)' — 카메라 폭(주) + 초음파(보조)
-    #         depth_mm = fuse_depth_mm(bbox_to_depth_mm(target._size_px), sonar_mm=None)
-    #         duty = distance_to_duty(depth_mm)
-    #         carriage_mm = target._rail_mm   # 추정값(단방향, 위치 피드백 없음). 3순위 선정만 영향
-    #         link.send(carriage_mm, duty, active=True)
+    os.chdir(ROOT)   # config 안의 상대경로(models/, data/) 기준
+    with open("config/coordinate.yaml", encoding="utf-8") as f:
+        integ = Integrator(yaml.safe_load(f))
+    perception = Perception.from_config()
+    if source.isdigit():
+        cap = cv2.VideoCapture(int(source), cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)    # REF·캘리브레이션과 같은 해상도
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    else:
+        cap = cv2.VideoCapture(source)
+    if not cap.isOpened():
+        raise RuntimeError(f"영상을 열 수 없음: {source}")
+
+    print(f"[노트북] 통합 송신 → {link.addr} (q 또는 Ctrl+C 종료)")
+    last_log = 0.0
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            obs = perception.update(frame)
+            now = time.time()
+            target_mm, duty, active = integ.step(obs, now)
+            link.send(target_mm, duty, active)
+
+            tid = integ.target.wid if active else None
+            if now - last_log > 0.5:
+                if active:
+                    print(f"  대상 ID {tid} | 레일 {target_mm:5.0f}mm | 깊이 {integ.depth_mm:5.0f}mm"
+                          f" | 팬 {duty:>3}% | 보이는 사람 {len(obs)}명")
+                else:
+                    print(f"  대상 없음 | 보이는 사람 {len(obs)}명")
+                last_log = now
+            if show:
+                for o in obs:
+                    x1, y1, x2, y2 = o.bbox
+                    hit = o.track_id == tid
+                    color = (0, 0, 255) if hit else (0, 255, 0)
+                    label = f"ID {o.track_id} | rail {o.rail_mm:.0f}mm"
+                    if hit:
+                        label += f" | depth {integ.depth_mm:.0f}mm | fan {duty}%"
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 4 if hit else 2)
+                    cv2.putText(frame, label, (x1, max(y1 - 10, 20)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                cv2.imshow("integration (q: quit)", frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        link.send(integ.carriage_mm, 0, active=False)
+        cap.release()
+        cv2.destroyAllWindows()
 
 
 def main():
@@ -84,6 +107,8 @@ def main():
     ap.add_argument("--host", required=True, help="라즈베리파이 IP")
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--demo", action="store_true", help="카메라 없이 연결 테스트")
+    ap.add_argument("--source", default="0", help="카메라 번호 또는 영상 파일")
+    ap.add_argument("--no-show", action="store_true", help="화면 창 없이 실행")
     args = ap.parse_args()
 
     link = PiLink(args.host, args.port)
@@ -93,7 +118,7 @@ def main():
         except KeyboardInterrupt:
             link.send(0, 0, active=False)
     else:
-        integration_loop(link)
+        integration_loop(link, args.source, show=not args.no_show)
 
 
 if __name__ == "__main__":
