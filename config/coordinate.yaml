@@ -27,11 +27,11 @@ rail:
   home_offset_mm: 5       # Homing 접촉 지점에서 원점(0)까지 여유
 
 stepper:
-  microstep: 16           # A4988 마이크로스텝 (1/16)
+  microstep: 8            # A4988 마이크로스텝 (1/8: MS1·MS2 HIGH, MS3 LOW)
   steps_per_rev: 200      # NEMA17 기본 (1.8도)
   belt_pitch_mm: 2        # GT2
   pulley_teeth: 20        # 20T → 1회전당 40mm 이동
-  # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 3200 = 0.0125
+  # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 1600 = 0.025
 
 # 깊이(mm) → 송풍 세기 3단계 (멀수록 강풍)
 fan_power:
