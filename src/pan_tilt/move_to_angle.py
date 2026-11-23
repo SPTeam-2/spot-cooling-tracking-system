@@ -1,6 +1,5 @@
 """
 [파일(내부 구현 코드) 목적]
-
 현재 명령 각도에서 목표 각도(pan·tilt)까지 최대 각속도로 조금씩 이동시키는 작동 알고리즘
 [코드 내용]
 MoveToAngleConfig: 최대 각속도(deg/s)·펄스 갱신 간격 검증
@@ -16,6 +15,8 @@ set_target() → 준비 상태·범위 검사 → update()마다 경과 시간 �
 출력 오류 시 두 축 출력 끄기 시도 / 실제 각도 측정 없음 (명령 각도 기준)
 참고: 개인 노션 #12(목표 각도 알고리즘), #코드 구조 관련(1장 move_to_angle.py)
 """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 import math
