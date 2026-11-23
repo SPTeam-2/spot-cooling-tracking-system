@@ -107,3 +107,26 @@ class StepperTests(unittest.TestCase):
         self.now=-1
         self.assertEqual(self.motor.update().reason,R.FAULT)
         self.hw.step_once.assert_not_called()
+
+
+class PulsePlanTests(unittest.TestCase):
+    def test_ramp_counts_inside_total(self):
+        from src.carriage.function_stepper import build_pulse_plan, plan_duration_s
+        plan = build_pulse_plan(1600, 250)
+        self.assertEqual(plan, [(0, 160), (40, 200), (80, 250), (1520, 200), (1560, 160)])
+        self.assertAlmostEqual(plan_duration_s(plan, 1600), 80/160 + 80/200 + 1440/250)
+
+    def test_short_moves_drop_highest_levels(self):
+        from src.carriage.function_stepper import build_pulse_plan
+        self.assertEqual(build_pulse_plan(150, 250), [(0, 160), (40, 200), (110, 160)])
+        self.assertEqual(build_pulse_plan(80, 250), [(0, 160)])
+        self.assertEqual(build_pulse_plan(1, 200), [(0, 160)])
+        self.assertEqual(build_pulse_plan(500, 160), [(0, 160)])
+        self.assertEqual(build_pulse_plan(500, 100), [(0, 100)])   # 시작 주파수보다 느리면 가감속 없음
+
+    def test_mode_selection(self):
+        from src.carriage.function_stepper import StepperFunctions
+        limits = LimitSwitchFunctions(Mock())
+        self.assertEqual(StepperFunctions(Mock(), limits, max_speed_steps_s=100).pulse_mode, 'step')
+        with self.assertRaises(ValueError):
+            StepperFunctions(Mock(), limits, max_speed_steps_s=100, pulse_mode='wave')

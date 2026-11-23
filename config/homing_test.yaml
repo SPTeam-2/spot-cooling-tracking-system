@@ -5,10 +5,11 @@
 # 실행: python3 scripts/carriage/pi/run_homing.py --home
 # 원점 이격 거리: coordinate.yaml rail.home_offset_mm (현재 5mm)
 # 방향(positive_dir_level)·속도 상한(max_speed)·통신 제한(io_timeout): stepper_test.yaml 값 사용
-# 단위: 속도 steps/s, 거리 스텝 (현재 설정 80 steps/mm 기준 1mm = 80스텝)
+# 단위: 속도 steps/s, 거리 스텝 (1/8 마이크로스텝 기준 1mm = 40스텝)
+# 속도는 PWM 허용 주파수만 가능 (방식 A): 현장 안정값 200 또는 250, 짧은 이동·느린 접근은 160
 
-fast_speed_steps_s: null   # 1차 접근·이격 속도, stepper_test.yaml max_speed 이하
-slow_speed_steps_s: null   # 2차 재접근·원점 이격 속도, fast 이하
+fast_speed_steps_s: null   # 1차 접근·이격 속도, stepper_test.yaml max_speed 이하 (예: 200)
+slow_speed_steps_s: null   # 2차 재접근·원점 이격 속도, fast 이하 (예: 160)
 backoff_steps: null        # 1차 접촉 후 이격량 / 시작 시 왼쪽이 눌려 있으면 빠져나오는 양
 max_seek_steps: null       # 1차 접근 최대 스텝, 레일 전체 길이보다 크게
 max_reseek_steps: null     # 2차 재접근 최대 스텝, backoff_steps보다 크게

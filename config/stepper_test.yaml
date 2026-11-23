@@ -5,10 +5,12 @@
 # 후퇴: python3 scripts/carriage/pi/run_stepper.py --move --direction -1
 # 명령줄 지정값이 우선하며, 변경 없이 재실행하려면 실제 사용값을 여기 기록하세요.
 # 핀은 pins.yaml, 벨트·풀리 사양은 coordinate.yaml에서 관리합니다.
+# 속도는 PWM 허용 주파수만 가능 (방식 A): 현장 안정값 200 또는 250, 짧은 이동·느린 접근은 160
+# 펄스는 160Hz 출발 → 단계 가속 → 정속 → 단계 감속 (가감속 펄스도 steps에 포함), 1/8 기준 1mm = 40스텝
 
 direction: null          # -1=모터 쪽, +1=모터에서 멀어지는 쪽
 steps: null              # 한 번 이동할 양의 정수 펄스 수
-speed: null              # 요청 속도 (steps/s)
-max_speed: null          # 현장에서 정한 속도 상한 (steps/s)
+speed: null              # 요청 속도 (steps/s = Hz), 200 또는 250
+max_speed: null          # 현장에서 정한 속도 상한 (steps/s), 현재 안정 상한 250
 positive_dir_level: null # +방향에 해당하는 DIR 신호 (0 또는 1), 짧은 시험으로 확인
-io_timeout: 0.25         # pigpiod 연결·명령 제한 시간(초), 정지거리 보장값 아님
+io_timeout: 0.25         # 값 검사만 함 (pigpio 라이브러리는 명령별 제한 시간 미지원), 정지거리 보장값 아님

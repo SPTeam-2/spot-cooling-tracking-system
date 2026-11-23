@@ -17,7 +17,7 @@ rail_range: [0, 530]    # 레일 위 캐리지 이동 범위 (mm) — rail.trave
 homography_file: data/calibration/homography.npz
 
 # ===== 제어 / 송풍 (통합부) =====
-# 좌표 원점: 레일 왼쪽 끝 X=0, 레일 중심선 Y=0, 책상면 Z=0 (도면집 기준)
+# 좌표 원점: 레일 왼쪽 끝(모터 부분) X=0, 레일 중심선 Y=0, 책상면 Z=0 (도면집 기준)
 # rail_* 값은 추정치. 조립 후 Homing 실측하여 갱신할 것. (위 rail_range와 동일 레일을 가리킴)
 rail:
   length_mm: 800          # 2040 V슬롯 전체 길이

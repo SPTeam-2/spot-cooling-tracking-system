@@ -5,6 +5,7 @@
 # 실행: python3 scripts/carriage/pi/run_target_move.py --move --wait
 # Homing 조건: homing_test.yaml / 방향·속도 상한·통신 제한: stepper_test.yaml
 # 목표 범위: coordinate.yaml rail.travel_mm (0mm = Homing 원점)
+# 속도는 PWM 허용 주파수만 가능 (방식 A): 현장 안정값 200 또는 250, 짧은 이동·느린 접근은 160
 
-speed_steps_s: null   # 목표 이동 속도(steps/s), stepper_test.yaml max_speed 이하
+speed_steps_s: null   # 목표 이동 속도(steps/s), stepper_test.yaml max_speed 이하 (현장 안정값 250)
 targets_mm: null      # 차례대로 이동할 목표 목록(mm), 예: [50, 200, 100, 0]
