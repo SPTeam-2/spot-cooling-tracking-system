@@ -1,6 +1,7 @@
 """노트북 송신부 — 인식·판단 결과를 파이로 전송(UDP).
 
 연결 테스트: python3 src/comms/pc_sender.py --host <파이IP> --demo
+고정 목표:   python3 src/comms/pc_sender.py --host <파이IP> --target 200   (--duty로 팬 세기)
 실제 통합:   python3 src/comms/pc_sender.py --host <파이IP>   (카메라 사용, --source로 영상 파일 가능)
 """
 
@@ -37,6 +38,14 @@ def demo(link: PiLink, hz: int = 20):
         target = 300 + 300 * math.sin(t * 0.5)
         duty = 40 + int(60 * (0.5 + 0.5 * math.sin(t * 0.3)))
         link.send(target, duty, active=True)
+        time.sleep(1.0 / hz)
+
+
+def hold(link: PiLink, target_mm: float, duty: int, hz: int = 20):
+    """같은 목표를 계속 보낸다 (캐리지 이동 시험용)."""
+    print(f"[노트북] 고정 목표 {target_mm}mm, 팬 {duty}% → {link.addr} (Ctrl+C 종료)")
+    while True:
+        link.send(target_mm, duty, active=True)
         time.sleep(1.0 / hz)
 
 
@@ -107,14 +116,19 @@ def main():
     ap.add_argument("--host", required=True, help="라즈베리파이 IP")
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--demo", action="store_true", help="카메라 없이 연결 테스트")
+    ap.add_argument("--target", type=float, help="카메라 없이 이 위치(mm)를 계속 보냄")
+    ap.add_argument("--duty", type=int, default=0, help="--target과 함께 보낼 팬 세기(%%)")
     ap.add_argument("--source", default="0", help="카메라 번호 또는 영상 파일")
     ap.add_argument("--no-show", action="store_true", help="화면 창 없이 실행")
     args = ap.parse_args()
 
     link = PiLink(args.host, args.port)
-    if args.demo:
+    if args.demo or args.target is not None:
         try:
-            demo(link)
+            if args.target is not None:
+                hold(link, args.target, args.duty)
+            else:
+                demo(link)
         except KeyboardInterrupt:
             link.send(0, 0, active=False)
     else:
