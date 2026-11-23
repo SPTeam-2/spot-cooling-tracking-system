@@ -1,8 +1,9 @@
-"""라즈베리파이 구동 서버 — 노트북 명령(UDP)을 받아 캐리지 이동 + 팬 제어.
+"""라즈베리파이 구동 서버 — 노트북 명령(UDP)을 받아 캐리지 이동 + 팬 + 팬틸트 제어.
 
-실행: python3 src/comms/pi_server.py   (하드웨어 없이 확인: --dummy)
+실행: sudo python3 src/comms/pi_server.py   (하드웨어 없이 확인: --dummy)
 실장비: 시작하면 먼저 Homing(원점 찾기) → 끝나면 노트북이 보낸 target_mm를 따라감.
 속도·Homing 값은 구동부 현장 시험 파일(config/*_test.yaml)을 그대로 읽는다.
+팬틸트는 pan_tilt_test.yaml이 채워져 있을 때만 켜지고, 비어 있으면 레일·팬만 동작한다.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import yaml
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from protocol import COMMS_TIMEOUT_S, PORT, Command
 from comms.carriage_rail import SimRail, build_carriage_rail, load_rail_settings
+from comms.pan_tilt_aim import SimPanTilt, build_pan_tilt, load_pan_tilt_settings
 
 _CFG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "config")
 LOOP_S = 0.001     # 구동부 update가 한 번에 최대 한 STEP이라 촘촘히 돌림
@@ -61,20 +63,33 @@ def udp_receiver(sock: socket.socket):
             _state["last_rx"] = time.time()
 
 
-def control_step(rail, fan, cmd: Command, linked: bool):
+def control_step(rail, fan, cmd: Command, linked: bool, aim=None):
     run = linked and cmd.active and not rail.fault
     rail.tick(cmd.target_mm if run else None)
     fan.set(cmd.fan_duty if run and not rail.fault else 0)
+    if aim is not None:
+        aim.tick(cmd.pan_deg if run else None, cmd.tilt_deg)
 
 
-def control_loop(rail, fan):
+def _angles_text(aim):
+    if aim is None:
+        return ""
+    if aim.fault:
+        return f" | {aim.fault}"
+    pan, tilt = aim.angles
+    if pan is None or tilt is None:
+        return " | 팬틸트 ?"
+    return f" | pan {pan:+5.1f}° tilt {tilt:+5.1f}°"
+
+
+def control_loop(rail, fan, aim=None):
     last_log = 0.0
     while True:
         with _lock:
             cmd = _state["cmd"]
             last_rx = _state["last_rx"]
         linked = bool(last_rx) and (time.time() - last_rx) < COMMS_TIMEOUT_S
-        control_step(rail, fan, cmd, linked)
+        control_step(rail, fan, cmd, linked, aim)
 
         now = time.time()
         if now - last_log > 0.5:
@@ -82,7 +97,8 @@ def control_loop(rail, fan):
                 else "연결" if linked else "끊김/대기"
             pos = rail.position_mm
             pos_s = "  ?  " if pos is None else f"{pos:6.1f}"
-            print(f"  [{tag}] 캐리지 {pos_s}mm → {cmd.target_mm:6.1f}mm | 팬 {fan.duty:>3}%", flush=True)
+            print(f"  [{tag}] 캐리지 {pos_s}mm → {cmd.target_mm:6.1f}mm | 팬 {fan.duty:>3}%"
+                  f"{_angles_text(aim)}", flush=True)
             last_log = now
         time.sleep(LOOP_S)
 
@@ -94,18 +110,20 @@ def main():
 
     with open(os.path.join(_CFG_DIR, "coordinate.yaml"), encoding="utf-8") as f:
         coord = yaml.safe_load(f)
-    fan = rail = None
+    fan = rail = aim = None
     try:
         if dummy:
             rail = SimRail(travel_mm=coord["rail"]["travel_mm"],
                            deadzone_mm=coord.get("control", {}).get("deadzone_mm", 20))
             fan = Fan(on_pi=False)
+            aim = SimPanTilt()
         else:
             with open(os.path.join(_CFG_DIR, "pins.yaml"), encoding="utf-8") as f:
                 pins = yaml.safe_load(f)
             settings = load_rail_settings(_CFG_DIR)
             fan = Fan(on_pi=True, pins=pins)
             rail = build_carriage_rail(pins, settings)
+            aim = _start_pan_tilt(pins)
     except Exception as e:
         if fan:
             fan.close()
@@ -115,18 +133,36 @@ def main():
     try:
         sock.bind(("", PORT))
     except OSError as e:
-        rail.close()
-        fan.close()
+        _close_all(rail, fan, aim)
         sys.exit(f"[파이] UDP {PORT} 포트를 열 수 없음: {e}\n  다른 pi_server가 이미 실행 중인지 확인")
     threading.Thread(target=udp_receiver, args=(sock,), daemon=True).start()
     print(f"[파이] UDP {PORT} 수신 대기 ({'더미' if dummy else '실장비'}) / Ctrl+C: 종료", flush=True)
     try:
-        control_loop(rail, fan)
+        control_loop(rail, fan, aim)
     except KeyboardInterrupt:
         pass
     finally:
-        rail.close()
-        fan.close()
+        _close_all(rail, fan, aim)
+
+
+def _start_pan_tilt(pins):
+    """팬틸트는 없어도 서버가 돌게: 값이 비었거나 시작에 실패하면 알리고 None."""
+    try:
+        settings, reason = load_pan_tilt_settings(_CFG_DIR)
+        if settings is None:
+            print(f"[파이] 팬틸트 꺼짐 — {reason}", flush=True)
+            return None
+        return build_pan_tilt(pins, settings)
+    except Exception as e:
+        print(f"[파이] 팬틸트 꺼짐 — 시작 실패: {e}", flush=True)
+        return None
+
+
+def _close_all(rail, fan, aim):
+    if aim is not None:
+        aim.close()
+    rail.close()
+    fan.close()
 
 
 if __name__ == "__main__":

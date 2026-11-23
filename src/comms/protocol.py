@@ -19,6 +19,8 @@ class Command:
     fan_duty: int = 0        # 팬 세기 0~100%
     active: bool = False     # 송풍 대상 있음? False면 파이는 팬 정지
     ts: float = 0.0          # 보낸 시각(time.time())
+    pan_deg: float = 0.0     # 팬틸트 좌우 (+ = 레일 + 방향, 모터에서 멀어지는 쪽)
+    tilt_deg: float = 0.0    # 팬틸트 상하 (+ = 위)
 
     def to_bytes(self) -> bytes:
         return (json.dumps(asdict(self)) + "\n").encode("utf-8")
@@ -27,4 +29,5 @@ class Command:
     def from_bytes(cls, data: bytes) -> "Command":
         d = json.loads(data.decode("utf-8"))
         return cls(float(d["target_mm"]), int(d["fan_duty"]),
-                   bool(d["active"]), float(d.get("ts", 0.0)))
+                   bool(d["active"]), float(d.get("ts", 0.0)),
+                   float(d.get("pan_deg", 0.0)), float(d.get("tilt_deg", 0.0)))

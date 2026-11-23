@@ -1,7 +1,7 @@
 """노트북 송신부 — 인식·판단 결과를 파이로 전송(UDP).
 
 연결 테스트: python3 src/comms/pc_sender.py --host <파이IP> --demo
-고정 목표:   python3 src/comms/pc_sender.py --host <파이IP> --target 200   (--duty로 팬 세기)
+고정 목표:   python3 src/comms/pc_sender.py --host <파이IP> --target 200   (--duty 팬 세기, --pan·--tilt 각도)
 실제 통합:   python3 src/comms/pc_sender.py --host <파이IP>   (카메라 사용, --source로 영상 파일 가능)
 """
 
@@ -24,8 +24,9 @@ class PiLink:
         self.addr = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    def send(self, target_mm: float, fan_duty: int, active: bool):
-        cmd = Command(target_mm, fan_duty, active, time.time())
+    def send(self, target_mm: float, fan_duty: int, active: bool,
+             pan_deg: float = 0.0, tilt_deg: float = 0.0):
+        cmd = Command(target_mm, fan_duty, active, time.time(), pan_deg, tilt_deg)
         self.sock.sendto(cmd.to_bytes(), self.addr)
 
 
@@ -37,15 +38,18 @@ def demo(link: PiLink, hz: int = 20):
         t = time.time() - t0
         target = 300 + 300 * math.sin(t * 0.5)
         duty = 40 + int(60 * (0.5 + 0.5 * math.sin(t * 0.3)))
-        link.send(target, duty, active=True)
+        pan = 15 * math.sin(t * 0.4)
+        link.send(target, duty, True, pan, 0.0)
         time.sleep(1.0 / hz)
 
 
-def hold(link: PiLink, target_mm: float, duty: int, hz: int = 20):
-    """같은 목표를 계속 보낸다 (캐리지 이동 시험용)."""
-    print(f"[노트북] 고정 목표 {target_mm}mm, 팬 {duty}% → {link.addr} (Ctrl+C 종료)")
+def hold(link: PiLink, target_mm: float, duty: int, pan: float = 0.0, tilt: float = 0.0,
+         hz: int = 20):
+    """같은 목표를 계속 보낸다 (캐리지 이동·팬틸트 시험용)."""
+    print(f"[노트북] 고정 목표 {target_mm}mm, 팬 {duty}%, pan {pan}° tilt {tilt}° → {link.addr}"
+          " (Ctrl+C 종료)")
     while True:
-        link.send(target_mm, duty, active=True)
+        link.send(target_mm, duty, True, pan, tilt)
         time.sleep(1.0 / hz)
 
 
@@ -79,13 +83,14 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
             obs = perception.update(frame)
             now = time.time()
             target_mm, duty, active = integ.step(obs, now)
-            link.send(target_mm, duty, active)
+            link.send(target_mm, duty, active, integ.pan_deg, integ.tilt_deg)
 
             tid = integ.target.wid if active else None
             if now - last_log > 0.5:
                 if active:
                     print(f"  대상 ID {tid} | 레일 {target_mm:5.0f}mm | 깊이 {integ.depth_mm:5.0f}mm"
-                          f" | 팬 {duty:>3}% | 보이는 사람 {len(obs)}명")
+                          f" | 팬 {duty:>3}% | pan {integ.pan_deg:+5.1f}° tilt {integ.tilt_deg:+5.1f}°"
+                          f" | 보이는 사람 {len(obs)}명")
                 else:
                     print(f"  대상 없음 | 보이는 사람 {len(obs)}명")
                 last_log = now
@@ -118,6 +123,8 @@ def main():
     ap.add_argument("--demo", action="store_true", help="카메라 없이 연결 테스트")
     ap.add_argument("--target", type=float, help="카메라 없이 이 위치(mm)를 계속 보냄")
     ap.add_argument("--duty", type=int, default=0, help="--target과 함께 보낼 팬 세기(%%)")
+    ap.add_argument("--pan", type=float, default=0.0, help="--target과 함께 보낼 pan 각도(도)")
+    ap.add_argument("--tilt", type=float, default=0.0, help="--target과 함께 보낼 tilt 각도(도)")
     ap.add_argument("--source", default="0", help="카메라 번호 또는 영상 파일")
     ap.add_argument("--no-show", action="store_true", help="화면 창 없이 실행")
     args = ap.parse_args()
@@ -126,7 +133,7 @@ def main():
     if args.demo or args.target is not None:
         try:
             if args.target is not None:
-                hold(link, args.target, args.duty)
+                hold(link, args.target, args.duty, args.pan, args.tilt)
             else:
                 demo(link)
         except KeyboardInterrupt:

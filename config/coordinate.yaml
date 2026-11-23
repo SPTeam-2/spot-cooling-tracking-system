@@ -48,6 +48,18 @@ control:
   cooldown_s: 5             # 방금 송풍받은 대상 재선정 제외 시간
   min_dwell_s: 8            # 한 대상 최소 유지 송풍 시간 (잦은 왕복 방지)
   deadzone_mm: 20           # 작은 좌표 흔들림 무시 (재이동 안 함)
+  carriage_speed_mm_s: 300  # 노트북이 캐리지 위치를 추정할 때 쓰는 속도. 실제 레일 속도로 맞출 것
+
+# 팬틸트 각도 (노트북 계산 → UDP pan_deg·tilt_deg)
+# 부호: pan + = 레일 + 방향(모터에서 멀어지는 쪽), tilt + = 위 → 파이 us_per_deg 부호를 여기에 맞춤
+pan_tilt:
+  mode: fixed               # fixed: 아래 고정 각도 / auto: 깊이·캐리지 위치로 계산
+  fixed_pan_deg: 0
+  fixed_tilt_deg: 0
+  fan_height_mm: 892        # 바닥~팬 중심 (책상 750 추정 + 책상면~팬 중심 142 실측)
+  aim_height_mm: 1200       # 바닥~겨냥 높이 (서 있는 사람 가슴)
+  max_pan_deg: 30           # 노트북 계산 상한, 파이는 pan_tilt_test.yaml 범위로 한 번 더 제한
+  max_tilt_deg: 30
 
 # 우선순위 "유사" 임계값 (단계식 동점 처리) — 공정성↔효율성 다이얼
 # 값이 클수록 "비슷하게 받았으면 가까운 사람 먼저"가 자주 발동 → 캐리지 이동↓(효율),
