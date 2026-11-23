@@ -17,6 +17,8 @@ set_target() → 원점·값·범위 검사 → (목표 − 현재)를 부호 �
 update() 한 번에 최대 한 STEP / 일정 속도 이동 (가감속은 #11-3) / 작은 흔들림 무시(deadzone)는 통합 제어 쪽
 참고: 개인 노션 #11-2, #코드 구조 관련 / coordinate.yaml rail.travel_mm
 """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 import math

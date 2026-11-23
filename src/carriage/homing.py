@@ -15,6 +15,8 @@ update() 한 번에 최대 한 STEP / 단계마다 최대 스텝·시간 제한 
 참고: 개인 노션 #8-1(6장 Homing 플로우·구현 규칙), #11-1, #코드 구조 관련
 팀 노션 4. 캐리지 이동 제어(원점측 스위치 기준 원점 설정) / coordinate.yaml rail.home_offset_mm
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from enum import Enum
 import math

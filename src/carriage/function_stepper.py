@@ -10,6 +10,8 @@ start_move()로 이동 접수 → update()에서 STOP·리미트 확인 → 최�
 한 스레드의 실행 루프에서 호출 / 반대 방향은 새 요청으로 후퇴 / 자동 재개 없음
 완료 펄스 수는 실제 위치 측정값이 아님 / 절대 위치 제어·Homing은 포함하지 않음
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from enum import Enum
 import math
