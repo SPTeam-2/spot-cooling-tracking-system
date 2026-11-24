@@ -63,13 +63,27 @@ class CarriageRail:
                 self.mover.stop()
             return
         t = max(0.0, min(self.travel_mm, float(target_mm)))
-        ref = res.target_mm if moving else self.position_mm
-        if ref is None or abs(t - ref) > self.deadzone_mm:
+        if self._should_retarget(t, res, moving):
             res = self.mover.set_target(t)
         if self.mover.result.status == TargetStatus.MOVING:
             res = self.mover.update()
         if res.status == TargetStatus.FAILED:
             self._set_fault(f"이동 실패: {res.error}")
+
+    def _should_retarget(self, t, res, moving):
+        """새 목표마다 이동을 다시 시작하면 매번 160Hz부터 가속해 거의 못 간다.
+        같은 방향으로 더 멀어진 목표는 지금 이동을 끝낸 뒤 이어서 가고,
+        방향이 바뀌거나 더 가까워졌을 때만 바로 바꾼다."""
+        pos = self.position_mm
+        if pos is None:
+            return True
+        if not moving:
+            return abs(t - pos) > self.deadzone_mm
+        goal = res.target_mm
+        if abs(t - goal) <= self.deadzone_mm:
+            return False
+        farther_same_way = (goal - pos) * (t - pos) > 0 and abs(t - pos) > abs(goal - pos)
+        return not farther_same_way
 
     def _set_fault(self, msg):
         self.fault = msg

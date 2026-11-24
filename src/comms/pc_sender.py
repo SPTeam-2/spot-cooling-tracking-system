@@ -26,11 +26,18 @@ class PiLink:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setblocking(False)
         self._sonar_mm, self._status_rx = None, 0.0
+        self._warned = 0.0
 
     def send(self, target_mm: float, fan_duty: int, active: bool,
              pan_deg: float = 0.0, tilt_deg: float = 0.0):
         cmd = Command(target_mm, fan_duty, active, time.time(), pan_deg, tilt_deg)
-        self.sock.sendto(cmd.to_bytes(), self.addr)
+        try:
+            self.sock.sendto(cmd.to_bytes(), self.addr)
+        except OSError as e:   # 와이파이 전환 등으로 잠깐 길이 없을 때: 죽지 않고 다음 프레임에 재시도
+            now = time.time()
+            if now - self._warned > 1.0:
+                print(f"  [노트북] 전송 실패 ({e.strerror}) — 파이와 같은 핫스팟인지 확인", flush=True)
+                self._warned = now
 
     def poll(self):
         """쌓인 Status를 모두 읽고 최신 초음파 값만 남긴다."""

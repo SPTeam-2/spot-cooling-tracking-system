@@ -116,6 +116,25 @@ class RailTests(unittest.TestCase):
         self.drive(40, 3)
         self.assertEqual(self.rail.position_mm, 40)
 
+    def test_target_moving_away_does_not_restart_each_frame(self):
+        self.make()
+        self.home()
+        calls = []
+        orig = self.rail.mover.set_target
+        self.rail.mover.set_target = lambda t: (calls.append(t), orig(t))[1]
+        for i in range(160):                 # 사람이 걸어가듯 목표가 50ms마다 1mm씩 멀어짐 (20mm/s)
+            self.drive(20 + i, 0.05)
+        self.drive(179, 3)
+        self.assertLessEqual(abs(self.rail.position_mm - 179), 20)   # 데드존 안까지 따라감
+        self.assertLess(len(calls), 15)      # 매 프레임(160번) 재시작하지 않음
+
+    def test_nearer_target_same_way_retargets_at_once(self):
+        self.make()
+        self.home()
+        self.drive(180, 0.2)
+        self.drive(60, 0.01)
+        self.assertEqual(self.rail.mover.result.target_mm, 60)
+
     def test_none_stops_and_holds(self):
         self.make()
         self.home()
