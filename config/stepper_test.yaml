@@ -1,0 +1,6 @@
+direction: 1
+steps: 1600
+speed: 4000              # 1/8 기준 100mm/s
+max_speed: 4000
+positive_dir_level: 1
+io_timeout: 0.25

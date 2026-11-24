@@ -1,0 +1,2 @@
+speed_steps_s: 4000
+targets_mm: [50, 200, 100, 0]

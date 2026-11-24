@@ -1,0 +1,13 @@
+pan:
+  center_pulse_us: 1550
+  us_per_deg: 17
+  min_deg: -42
+  max_deg: 36
+tilt:
+  center_pulse_us: 1650
+  us_per_deg: -20
+  min_deg: -3
+  max_deg: 30
+max_speed_deg_s: 60
+targets_deg: [[20, 0], [-20, 10], [0, 0]]
+io_timeout: 0.25

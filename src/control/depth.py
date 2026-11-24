@@ -14,10 +14,11 @@ def bbox_to_depth_mm(size_px: float, *,
 
 
 def fuse_depth_mm(cam_mm: float, sonar_mm: float | None = None, *,
-                  max_gap_mm: float = 400.0) -> float:
+                  sonar_weight: float = 0.5, max_gap_mm: float = 400.0) -> float:
     # 초음파가 max_gap 이상 벗어나면 벽·사물로 보고 버림
     if sonar_mm is None:
         return cam_mm
     if abs(cam_mm - sonar_mm) > max_gap_mm:
         return cam_mm
-    return (cam_mm + sonar_mm) / 2
+    w = max(0.0, min(1.0, sonar_weight))
+    return (1 - w) * cam_mm + w * sonar_mm

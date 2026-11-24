@@ -1,0 +1,7 @@
+fast_speed_steps_s: 200    # 1차 접근, 느리게 해야 스위치를 정확히 잡음
+slow_speed_steps_s: 160    # 2차 재접근
+backoff_steps: 200
+max_seek_steps: 34000
+max_reseek_steps: 400
+phase_timeout_s: 200
+settle_s: 0.02

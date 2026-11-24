@@ -12,26 +12,31 @@ real_points:
   - [0, 1500]     # 4. 시작점, 높이 1.5m
 
 real_range: [0, 2000]   # 실제 작업자 이동 범위 x (mm)
-rail_range: [0, 600]    # 레일 위 캐리지 이동 범위 (mm) — 임시값, 구동부 값 받으면 수정
+rail_range: [0, 705]   # travel_mm과 동일
 
 homography_file: data/calibration/homography.npz
 
 # ===== 제어 / 송풍 (통합부) =====
-# 좌표 원점: 레일 왼쪽 끝 X=0, 레일 중심선 Y=0, 책상면 Z=0 (도면집 기준)
+# 좌표 원점: 레일 왼쪽 끝(모터 부분) X=0, 레일 중심선 Y=0, 책상면 Z=0 (도면집 기준)
 # rail_* 값은 추정치. 조립 후 Homing 실측하여 갱신할 것. (위 rail_range와 동일 레일을 가리킴)
 rail:
   length_mm: 800          # 2040 V슬롯 전체 길이
-  travel_mm: 530          # 캐리지 중심 이동 범위 (추정, 실측 후 갱신)
+  travel_mm: 705          # 실측 713, 여유 8 (11-25 구동부)
   limit_left_mm: 75       # 왼쪽 리미트 스위치 위치 (X)
   limit_right_mm: 725     # 오른쪽 리미트 스위치 위치 (X)
   home_offset_mm: 5       # Homing 접촉 지점에서 원점(0)까지 여유
 
 stepper:
-  microstep: 16           # A4988 마이크로스텝 (1/16)
+  microstep: 8            # A4988 마이크로스텝 (1/8: MS1·MS2 HIGH, MS3 LOW)
   steps_per_rev: 200      # NEMA17 기본 (1.8도)
   belt_pitch_mm: 2        # GT2
   pulley_teeth: 20        # 20T → 1회전당 40mm 이동
-  # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 3200 = 0.0125
+  # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 1600 = 0.025
+
+# 깊이 = 카메라(어깨 너비) · 초음파 가중 평균
+depth:
+  sonar_weight: 0.5         # 초음파 비중 0~1 (0.5 = 카메라 50 : 초음파 50, 0.7 = 30 : 70)
+  max_gap_mm: 400           # 두 값이 이보다 차이 나면 초음파는 벽·사물로 보고 카메라만 씀
 
 # 깊이(mm) → 송풍 세기 3단계 (멀수록 강풍)
 fan_power:
@@ -48,6 +53,18 @@ control:
   cooldown_s: 5             # 방금 송풍받은 대상 재선정 제외 시간
   min_dwell_s: 8            # 한 대상 최소 유지 송풍 시간 (잦은 왕복 방지)
   deadzone_mm: 20           # 작은 좌표 흔들림 무시 (재이동 안 함)
+  carriage_speed_mm_s: 100  # 1/8 스텝 4000Hz 실측 (11-25 구동부)
+
+# 팬틸트 각도 (노트북 계산 → UDP pan_deg·tilt_deg)
+# 부호: pan + = 레일 + 방향(모터에서 멀어지는 쪽), tilt + = 위 → 파이 us_per_deg 부호를 여기에 맞춤
+pan_tilt:
+  mode: fixed               # fixed: 아래 고정 각도 / auto: 깊이·캐리지 위치로 계산
+  fixed_pan_deg: 0
+  fixed_tilt_deg: 0
+  fan_height_mm: 892        # 바닥~팬 중심 (책상 750 추정 + 책상면~팬 중심 142 실측)
+  aim_height_mm: 1200       # 바닥~겨냥 높이 (서 있는 사람 가슴)
+  max_pan_deg: 30           # 노트북 계산 상한, 파이는 pan_tilt_test.yaml 범위로 한 번 더 제한
+  max_tilt_deg: 30
 
 # 우선순위 "유사" 임계값 (단계식 동점 처리) — 공정성↔효율성 다이얼
 # 값이 클수록 "비슷하게 받았으면 가까운 사람 먼저"가 자주 발동 → 캐리지 이동↓(효율),
