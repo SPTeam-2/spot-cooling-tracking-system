@@ -14,12 +14,13 @@ CARRIAGE_SPEED_MM_S = 300.0    # coordinate.yaml control.carriage_speed_mm_s가 
 
 class Integrator:
     def __init__(self, cfg: dict):
-        ctrl, pr, fan = (cfg.get(k, {}) for k in ("control", "priority", "fan_power"))
+        ctrl, pr, fan, dep = (cfg.get(k) or {} for k in ("control", "priority", "fan_power", "depth"))
         self.min_dwell_s = ctrl.get("min_dwell_s", 8)
         self.cooldown_s = ctrl.get("cooldown_s", 5)
         self.arrive_mm = ctrl.get("deadzone_mm", 20)
         self.speed_mm_s = ctrl.get("carriage_speed_mm_s", CARRIAGE_SPEED_MM_S)
         self._pt = cfg.get("pan_tilt") or {}
+        self._fuse = {k: dep[k] for k in ("sonar_weight", "max_gap_mm") if k in dep}
         self.pan_deg, self.tilt_deg = self._fixed_angles()
         self._pr = {k: pr[k] for k in ("cooled_similar_s", "wait_similar_s") if k in pr}
         self._fan = {k: fan[k] for k in ("near_max_mm", "mid_max_mm", "duty_near", "duty_mid",
@@ -83,7 +84,7 @@ class Integrator:
 
         o = self._obs[self.target.wid]
         size_px = o.shoulder_px if o.shoulder_px is not None else o.width_px   # 어깨 우선, 없으면 박스 폭
-        self.depth_mm = fuse_depth_mm(bbox_to_depth_mm(size_px), sonar_mm)
+        self.depth_mm = fuse_depth_mm(bbox_to_depth_mm(size_px), sonar_mm, **self._fuse)
         self.duty = distance_to_duty(self.depth_mm, self.duty, **self._fan)
         self.pan_deg, self.tilt_deg = self._aim(o.rail_mm, self.depth_mm)
         return o.rail_mm, self.duty, True

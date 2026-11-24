@@ -100,6 +100,23 @@ def obs(shoulder_px=343.0):
 
 
 class FusionTests(unittest.TestCase):
+    def test_weight_from_config(self):
+        integ = Integrator({"rail_range": [0, 600], "depth": {"sonar_weight": 0.7}})
+        integ.step([obs()], 0.0, sonar_mm=1100)     # 0.3*1000 + 0.7*1100
+        self.assertAlmostEqual(integ.depth_mm, 1070)
+
+    def test_gap_from_config(self):
+        integ = Integrator({"rail_range": [0, 600], "depth": {"max_gap_mm": 50}})
+        integ.step([obs()], 0.0, sonar_mm=1100)
+        self.assertAlmostEqual(integ.depth_mm, 1000)
+
+    def test_repo_config_is_half_half(self):
+        import yaml
+        with open(ROOT / "config" / "coordinate.yaml", encoding="utf-8") as f:
+            integ = Integrator(yaml.safe_load(f))
+        integ.step([obs()], 0.0, sonar_mm=1100)
+        self.assertAlmostEqual(integ.depth_mm, 1050)
+
     def test_sonar_averaged_with_camera(self):
         integ = Integrator({"rail_range": [0, 600]})
         integ.step([obs()], 0.0, sonar_mm=1100)     # 카메라 1000mm
