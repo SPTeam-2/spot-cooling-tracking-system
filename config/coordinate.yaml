@@ -12,7 +12,7 @@ real_points:
   - [0, 1500]     # 4. 시작점, 높이 1.5m
 
 real_range: [0, 2000]   # 실제 작업자 이동 범위 x (mm)
-rail_range: [0, 530]    # 레일 위 캐리지 이동 범위 (mm) — rail.travel_mm과 같은 값, 실측 후 함께 갱신
+rail_range: [0, 705]   # travel_mm과 동일
 
 homography_file: data/calibration/homography.npz
 
@@ -21,7 +21,7 @@ homography_file: data/calibration/homography.npz
 # rail_* 값은 추정치. 조립 후 Homing 실측하여 갱신할 것. (위 rail_range와 동일 레일을 가리킴)
 rail:
   length_mm: 800          # 2040 V슬롯 전체 길이
-  travel_mm: 530          # 캐리지 중심 이동 범위 (추정, 실측 후 갱신)
+  travel_mm: 705          # 실측 713, 여유 8 (11-25 구동부)
   limit_left_mm: 75       # 왼쪽 리미트 스위치 위치 (X)
   limit_right_mm: 725     # 오른쪽 리미트 스위치 위치 (X)
   home_offset_mm: 5       # Homing 접촉 지점에서 원점(0)까지 여유
@@ -53,7 +53,7 @@ control:
   cooldown_s: 5             # 방금 송풍받은 대상 재선정 제외 시간
   min_dwell_s: 8            # 한 대상 최소 유지 송풍 시간 (잦은 왕복 방지)
   deadzone_mm: 20           # 작은 좌표 흔들림 무시 (재이동 안 함)
-  carriage_speed_mm_s: 300  # 노트북이 캐리지 위치를 추정할 때 쓰는 속도. 실제 레일 속도로 맞출 것
+  carriage_speed_mm_s: 100  # 1/8 스텝 4000Hz 실측 (11-25 구동부)
 
 # 팬틸트 각도 (노트북 계산 → UDP pan_deg·tilt_deg)
 # 부호: pan + = 레일 + 방향(모터에서 멀어지는 쪽), tilt + = 위 → 파이 us_per_deg 부호를 여기에 맞춤
