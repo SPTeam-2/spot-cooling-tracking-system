@@ -62,16 +62,15 @@ def _sonar_text(mm):
     return "초음파 -" if mm is None else f"초음파 {mm:5.0f}mm"
 
 
-def demo(link: PiLink, hz: int = 20):
-    """카메라 없이 목표를 왕복시켜 파이와의 연결을 확인한다."""
+def demo(link: PiLink, pan: float = 0.0, tilt: float = 0.0, hz: int = 20):
+    """카메라 없이 목표를 왕복시켜 파이와의 연결을 확인한다. 팬틸트는 고정 각도(--pan·--tilt)."""
     print(f"[노트북] 데모 송신 → {link.addr} (Ctrl+C 종료)")
     t0 = last_log = time.time()
     while True:
         t = time.time() - t0
         target = 300 + 300 * math.sin(t * 0.5)
         duty = 40 + int(60 * (0.5 + 0.5 * math.sin(t * 0.3)))
-        pan = 15 * math.sin(t * 0.4)
-        link.send(target, duty, True, pan, 0.0)
+        link.send(target, duty, True, pan, tilt)
         if time.time() - last_log > 0.5:
             print(f"  목표 {target:5.0f}mm | 팬 {duty:>3}% | {_sonar_text(link.sonar_mm())}")
             last_log = time.time()
@@ -96,12 +95,15 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
     """카메라 → 인식 → 대상 선정 → 깊이·팬 세기 → 파이 전송."""
     import cv2
     import yaml
+    from src.comms import overlay
     from src.control.integrator import Integrator
     from src.vision.perception import Perception
 
     os.chdir(ROOT)   # config 안의 상대경로(models/, data/) 기준
     with open("config/coordinate.yaml", encoding="utf-8") as f:
-        integ = Integrator(yaml.safe_load(f))
+        cfg = yaml.safe_load(f)
+    integ = Integrator(cfg)
+    rail_range = cfg.get("rail_range", [0, 600])
     perception = Perception.from_config()
     if source.isdigit():
         cap = cv2.VideoCapture(int(source), cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY)
@@ -114,6 +116,7 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
 
     print(f"[노트북] 통합 송신 → {link.addr} (q 또는 Ctrl+C 종료)")
     last_log = 0.0
+    win, flip = None, False
     try:
         while True:
             ok, frame = cap.read()
@@ -135,17 +138,12 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
                     print(f"  대상 없음 | 보이는 사람 {len(obs)}명")
                 last_log = now
             if show:
-                for o in obs:
-                    x1, y1, x2, y2 = o.bbox
-                    hit = o.track_id == tid
-                    color = (0, 0, 255) if hit else (0, 255, 0)
-                    label = f"ID {o.track_id} | rail {o.rail_mm:.0f}mm"
-                    if hit:
-                        label += f" | depth {integ.depth_mm:.0f}mm | fan {duty}%"
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 4 if hit else 2)
-                    cv2.putText(frame, label, (x1, max(y1 - 10, 20)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                cv2.imshow("integration (q: quit)", frame)
+                if win is None:
+                    win = "spot cooler (q: quit)"
+                    cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow(win, 1280, 720)
+                    flip = overlay.motor_on_right(perception.transformer, frame.shape[1], frame.shape[0])
+                cv2.imshow(win, overlay.draw(frame, obs, integ, rail_range, duty, active, sonar, flip))
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
     except KeyboardInterrupt:
@@ -163,8 +161,8 @@ def main():
     ap.add_argument("--demo", action="store_true", help="카메라 없이 연결 테스트")
     ap.add_argument("--target", type=float, help="카메라 없이 이 위치(mm)를 계속 보냄")
     ap.add_argument("--duty", type=int, default=0, help="--target과 함께 보낼 팬 세기(%%)")
-    ap.add_argument("--pan", type=float, default=0.0, help="--target과 함께 보낼 pan 각도(도)")
-    ap.add_argument("--tilt", type=float, default=0.0, help="--target과 함께 보낼 tilt 각도(도)")
+    ap.add_argument("--pan", type=float, default=0.0, help="--target·--demo와 함께 보낼 pan 각도(도)")
+    ap.add_argument("--tilt", type=float, default=0.0, help="--target·--demo와 함께 보낼 tilt 각도(도)")
     ap.add_argument("--source", default="0", help="카메라 번호 또는 영상 파일")
     ap.add_argument("--no-show", action="store_true", help="화면 창 없이 실행")
     args = ap.parse_args()
@@ -175,7 +173,7 @@ def main():
             if args.target is not None:
                 hold(link, args.target, args.duty, args.pan, args.tilt)
             else:
-                demo(link)
+                demo(link, args.pan, args.tilt)
         except KeyboardInterrupt:
             link.send(0, 0, active=False)
     else:

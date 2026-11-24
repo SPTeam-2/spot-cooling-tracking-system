@@ -4,7 +4,7 @@
   Mac:      python3 scripts/run_all.py --demo
   갤럭시북: scripts\run_all_galaxybook.bat --demo   (인자 없이 더블클릭하면 --demo)
   --target 300 --duty 70  고정 목표 / 인자 없음(Mac) = 카메라 통합, --source 1로 카메라 번호
-  --pull: 시작 전에 파이에서 git pull
+  --pull: 시작 전에 노트북의 현재 브랜치(커밋된 것)를 랜선으로 파이에 넘김 (파이 인터넷 불필요)
 
 연결은 랜선 고정: 노트북 192.168.1.10 ↔ 파이 192.168.1.9 (파이 eth0 고정 주소).
 SSH 키가 없거나 안 맞으면 한 번만 파이 비밀번호를 물어 등록한다.
@@ -134,11 +134,34 @@ def ssh_cmd(pi, remote, tty=False):
             *(["-tt"] if tty else []), pi, remote]
 
 
-def remote_start(pull):
+def sync_pi(pi):
+    """노트북 브랜치를 SSH로 파이 저장소에 밀어 넣고 파이에서 fast-forward. 실패해도 기존 코드로 계속."""
+    branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT,
+                            capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                           capture_output=True, text=True).stdout.strip()
+    if dirty:
+        log("커밋 안 한 수정은 파이로 안 넘어감 (커밋된 것만)")
+    env = dict(os.environ, GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5")
+    ref = f"refs/remotes/laptop/{branch}"
+    log(f"노트북 {branch} → 파이로 코드 넘기는 중")
+    push = subprocess.run(["git", "push", "-q", "-f", f"{pi}:spot-cooling-tracking-system", f"HEAD:{ref}"],
+                          cwd=ROOT, env=env, capture_output=True, text=True)
+    if push.returncode != 0:
+        log(f"코드 넘기기 실패, 파이 기존 코드로 실행: {push.stderr.strip()}")
+        return
+    r = subprocess.run(ssh_cmd(pi, f"cd {PI_DIR} && git checkout -q {branch} && git merge -q --ff-only {ref}"),
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        log(f"파이에서 합치기 실패, 기존 코드로 실행 (파이에 따로 고친 게 있으면 정리 필요): {r.stderr.strip()}")
+    else:
+        log("파이 코드 최신으로 맞춤")
+
+
+def remote_start():
     """남은 서버 정리 → pigpiod·와이파이 절전 끄기 → 서버 실행.
     서버 경로를 변수로 넘겨 pkill 패턴이 이 SSH 셸 자신과 맞지 않게 한다."""
-    pre = f"cd {PI_DIR}" + (" && git pull --ff-only" if pull else "")
-    return (f"{pre} && S={SERVER}; sudo -n pkill -f '{SERVER_PATTERN}'; sleep 0.5; "
+    return (f"cd {PI_DIR} && S={SERVER}; sudo -n pkill -f '{SERVER_PATTERN}'; sleep 0.5; "
             "pgrep pigpiod >/dev/null || sudo -n pigpiod; sleep 0.5; "
             "sudo -n iw wlan0 set power_save off 2>/dev/null; "
             "exec sudo -n python3 -u $S")
@@ -166,7 +189,7 @@ def find_python(env=CONDA_ENV):
 def sender_args(a, pi_host, python=None):
     args = [python or sys.executable, os.path.join(ROOT, "src", "comms", "pc_sender.py"), "--host", pi_host]
     if a.demo:
-        args.append("--demo")
+        args += ["--demo", "--pan", str(a.pan), "--tilt", str(a.tilt)]
     elif a.target is not None:
         args += ["--target", str(a.target), "--duty", str(a.duty), "--pan", str(a.pan), "--tilt", str(a.tilt)]
     else:
@@ -234,7 +257,7 @@ def main():
     ap.add_argument("--tilt", type=float, default=0.0)
     ap.add_argument("--source", default="0", help="카메라 번호 (아이폰이 0번을 잡으면 1)")
     ap.add_argument("--no-show", action="store_true")
-    ap.add_argument("--pull", action="store_true", help="시작 전에 파이에서 git pull")
+    ap.add_argument("--pull", action="store_true", help="시작 전에 노트북 코드를 랜선으로 파이에 넘김")
     ap.add_argument("--pi-ip", default="192.168.1.9")
     ap.add_argument("--my-ip", default="192.168.1.10")
     ap.add_argument("--iface", default="이더넷" if is_windows() else "en22", help="랜 어댑터 이름")
@@ -247,9 +270,11 @@ def main():
         sys.exit(f"[실행] 파이 {a.pi_ip} 응답 없음 — 랜선, 파이 전원 확인")
     if not ensure_ssh_key(pi):
         sys.exit(1)
+    if a.pull:
+        sync_pi(pi)
     log(f"파이 {a.pi_ip} 연결됨 → 서버 시작")
 
-    server = PiServer(ssh_cmd(pi, remote_start(a.pull)))
+    server = PiServer(ssh_cmd(pi, remote_start()))
     sender = None
     try:
         log("원점 찾는 중 (최대 몇 분)")

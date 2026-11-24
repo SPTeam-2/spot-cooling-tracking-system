@@ -30,6 +30,7 @@ class Integrator:
         self.workers: dict[int, Worker] = {}
         self.target: Worker | None = None
         self.depth_mm: float | None = None
+        self.cam_depth_mm: float | None = None
         self.duty: int | None = None
         self._obs = {}
         self._last_seen: dict[int, float] = {}
@@ -78,16 +79,21 @@ class Integrator:
             self._dwell_left -= dt
 
         if self.target is None:
-            self.depth_mm = self.duty = None
+            self.depth_mm = self.cam_depth_mm = self.duty = None
             self.pan_deg, self.tilt_deg = self._fixed_angles()
             return self.carriage_mm, 0, False
 
         o = self._obs[self.target.wid]
         size_px = o.shoulder_px if o.shoulder_px is not None else o.width_px   # 어깨 우선, 없으면 박스 폭
-        self.depth_mm = fuse_depth_mm(bbox_to_depth_mm(size_px), sonar_mm, **self._fuse)
+        self.cam_depth_mm = bbox_to_depth_mm(size_px)
+        self.depth_mm = fuse_depth_mm(self.cam_depth_mm, sonar_mm, **self._fuse)
         self.duty = distance_to_duty(self.depth_mm, self.duty, **self._fan)
         self.pan_deg, self.tilt_deg = self._aim(o.rail_mm, self.depth_mm)
         return o.rail_mm, self.duty, True
+
+    @property
+    def dwell_left_s(self) -> float:
+        return self._dwell_left
 
     def _fixed_angles(self) -> tuple[float, float]:
         return float(self._pt.get("fixed_pan_deg", 0)), float(self._pt.get("fixed_tilt_deg", 0))
