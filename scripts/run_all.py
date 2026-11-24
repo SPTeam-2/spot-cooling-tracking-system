@@ -1,12 +1,13 @@
-"""한 번에 실행: 랜선 확인 → SSH로 파이 서버 시작 → 원점 찾기 대기 → 노트북 송신.
+"""한 번에 실행: 랜선 확인 → SSH 키 확인 → 파이 서버 시작 → 원점 찾기 대기 → 노트북 송신.
 
-실행 (Mac, conda activate sensorpro 후):
-  python3 scripts/run_all.py --demo                  카메라 없이 왕복
-  python3 scripts/run_all.py --target 300 --duty 70  고정 목표
-  python3 scripts/run_all.py                         카메라 통합 (--source 1로 카메라 번호)
+실행 (가상환경 상관없음 — 노트북 송신은 conda sensorpro가 있으면 그 파이썬으로 자동 실행):
+  Mac:      python3 scripts/run_all.py --demo
+  갤럭시북: scripts\run_all_galaxybook.bat --demo   (인자 없이 더블클릭하면 --demo)
+  --target 300 --duty 70  고정 목표 / 인자 없음(Mac) = 카메라 통합, --source 1로 카메라 번호
   --pull: 시작 전에 파이에서 git pull
 
 연결은 랜선 고정: 노트북 192.168.1.10 ↔ 파이 192.168.1.9 (파이 eth0 고정 주소).
+SSH 키가 없거나 안 맞으면 한 번만 파이 비밀번호를 물어 등록한다.
 Ctrl+C 한 번이면 노트북 송신과 파이 서버를 함께 끈다 (파이는 팬·모터 정리 후 종료).
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import threading
@@ -28,6 +30,7 @@ HOMING_TIMEOUT_S = 300
 READY_TAGS = ("[연결]", "[끊김/대기]")
 FAIL_TAGS = ("오류:", "초기화 실패", "포트를 열 수 없음", "sudo:")
 IMPORTANT = ("오류", "실패", "꺼짐", "sudo:")
+CONDA_ENV = "sensorpro"   # 인식(ultralytics)이 깔린 환경
 
 
 def log(msg):
@@ -38,10 +41,16 @@ def is_mac():
     return platform.system() == "Darwin"
 
 
+def is_windows():
+    return os.name == "nt"
+
+
 def ensure_lan(iface, my_ip):
-    """Mac: 랜 어댑터에 고정 주소가 없으면 넣는다 (비밀번호 한 번). 다른 OS는 안내만."""
+    """랜 어댑터에 고정 주소가 없으면 넣는다. Mac: sudo(비밀번호 한 번), 윈도우: 관리자면 netsh, 아니면 안내."""
+    if is_windows():
+        return _ensure_lan_windows(iface, my_ip)
     if not is_mac():
-        log(f"Mac이 아니라 주소 설정은 건너뜀 — 랜 어댑터 IPv4를 수동 {my_ip} / 255.255.255.0으로 해둘 것")
+        log(f"주소 설정은 건너뜀 — 랜 어댑터 IPv4를 수동 {my_ip} / 255.255.255.0으로 해둘 것")
         return True
     out = subprocess.run(["ifconfig", iface], capture_output=True, text=True)
     if out.returncode != 0:
@@ -53,9 +62,71 @@ def ensure_lan(iface, my_ip):
     return subprocess.run(["sudo", "ifconfig", iface, "alias", my_ip, "255.255.255.0"]).returncode == 0
 
 
+def _ensure_lan_windows(iface, my_ip):
+    out = subprocess.run(["ipconfig"], capture_output=True, text=True, errors="replace")
+    if my_ip in out.stdout:
+        return True
+    cmd = ["netsh", "interface", "ipv4", "set", "address", f"name={iface}", "static", my_ip, "255.255.255.0"]
+    try:
+        import ctypes
+        admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        admin = False
+    if admin:
+        log(f"'{iface}'에 {my_ip} 고정 (한 번 하면 계속 유지)")
+        if subprocess.run(cmd).returncode == 0:
+            time.sleep(3)   # 윈도우가 주소를 적용하는 시간
+            return True
+    log(f"랜 어댑터에 {my_ip}가 없음. 처음 한 번만 아래 중 하나:")
+    log("  1) 이 창을 '관리자 권한으로 실행'해서 다시 실행 (어댑터 이름은 --iface, 기본 '이더넷')")
+    log(f"     이름 확인: netsh interface show interface")
+    log(f"  2) 설정 → 네트워크 → 이더넷 → IP 할당 편집 → 수동, IPv4 {my_ip} / 서브넷 255.255.255.0")
+    return False
+
+
 def ping(host):
     cmd = ["ping", "-n", "1", "-w", "2000", host] if os.name == "nt" else ["ping", "-c", "1", "-t" if is_mac() else "-W", "2", host]
     return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def ssh_ok(pi):
+    r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+                        "-o", "ConnectTimeout=5", pi, "true"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return r.returncode == 0
+
+
+def _public_key():
+    d = os.path.join(os.path.expanduser("~"), ".ssh")
+    for name in ("id_ed25519", "id_rsa", "id_ecdsa"):
+        if os.path.exists(os.path.join(d, name + ".pub")):
+            return os.path.join(d, name + ".pub")
+    os.makedirs(d, exist_ok=True)
+    key = os.path.join(d, "id_ed25519")
+    log("SSH 키가 없어 새로 만드는 중")
+    subprocess.run(["ssh-keygen", "-t", "ed25519", "-N", "", "-f", key], stdout=subprocess.DEVNULL)
+    return key + ".pub"
+
+
+def ensure_ssh_key(pi):
+    """비밀번호 없이 SSH가 안 되면 키를 파이에 등록한다 (파이 비밀번호 한 번)."""
+    if ssh_ok(pi):
+        return True
+    pub = _public_key()
+    log(f"SSH 키 등록 — 파이({pi}) 비밀번호를 한 번 입력")
+    if shutil.which("ssh-copy-id"):
+        subprocess.run(["ssh-copy-id", "-o", "StrictHostKeyChecking=accept-new", "-i", pub, pi])
+    else:   # 윈도우에는 ssh-copy-id가 없어 같은 일을 직접 함
+        with open(pub, encoding="utf-8") as f:
+            key = f.read().strip()
+        remote = ('mkdir -p ~/.ssh && chmod 700 ~/.ssh && k=$(cat) && '
+                  '(grep -qxF "$k" ~/.ssh/authorized_keys 2>/dev/null || echo "$k" >> ~/.ssh/authorized_keys) '
+                  '&& chmod 600 ~/.ssh/authorized_keys')
+        subprocess.run(ssh_cmd(pi, remote), input=key + "\n", text=True)
+    if ssh_ok(pi):
+        return True
+    log("SSH 키 등록 실패 — 비밀번호를 다시 확인하고 재실행")
+    return False
 
 
 def ssh_cmd(pi, remote, tty=False):
@@ -73,8 +144,27 @@ def remote_start(pull):
             "exec sudo -n python3 -u $S")
 
 
-def sender_args(a, pi_host):
-    args = [sys.executable, os.path.join(ROOT, "src", "comms", "pc_sender.py"), "--host", pi_host]
+def find_python(env=CONDA_ENV):
+    """conda 환경의 파이썬 경로. 못 찾으면 지금 파이썬."""
+    bases = []
+    if os.environ.get("CONDA_EXE"):
+        bases.append(os.path.dirname(os.path.dirname(os.environ["CONDA_EXE"])))
+    if os.environ.get("CONDA_PREFIX"):
+        p = os.environ["CONDA_PREFIX"]
+        bases.append(os.path.dirname(os.path.dirname(p)) if os.sep + "envs" + os.sep in p else p)
+    home = os.path.expanduser("~")
+    bases += ["/opt/homebrew/anaconda3", "/opt/homebrew/Caskroom/miniconda/base",
+              os.path.join(home, "anaconda3"), os.path.join(home, "miniconda3")]
+    exe = os.path.join("python.exe") if os.name == "nt" else os.path.join("bin", "python")
+    for b in bases:
+        cand = os.path.join(b, "envs", env, exe)
+        if os.path.exists(cand):
+            return cand
+    return sys.executable
+
+
+def sender_args(a, pi_host, python=None):
+    args = [python or sys.executable, os.path.join(ROOT, "src", "comms", "pc_sender.py"), "--host", pi_host]
     if a.demo:
         args.append("--demo")
     elif a.target is not None:
@@ -88,9 +178,12 @@ class PiServer:
     """SSH로 띄운 pi_server의 출력을 읽어 상태를 판단한다."""
 
     def __init__(self, cmd):
+        # Ctrl+C가 SSH를 바로 죽이지 않게 따로 떼어 실행 (끌 때는 stop_pi로 파이에 정리 신호)
+        detach = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if is_windows()
+                  else {"start_new_session": True})
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     stdin=subprocess.DEVNULL, text=True, bufsize=1,
-                                     start_new_session=True)   # Ctrl+C가 SSH를 바로 죽이지 않게
+                                     stdin=subprocess.DEVNULL, text=True, encoding="utf-8",
+                                     errors="replace", bufsize=1, **detach)
         self.ready = threading.Event()
         self.failed = None
         self.quiet = False
@@ -144,7 +237,7 @@ def main():
     ap.add_argument("--pull", action="store_true", help="시작 전에 파이에서 git pull")
     ap.add_argument("--pi-ip", default="192.168.1.9")
     ap.add_argument("--my-ip", default="192.168.1.10")
-    ap.add_argument("--iface", default="en22", help="Mac 랜 어댑터 이름")
+    ap.add_argument("--iface", default="이더넷" if is_windows() else "en22", help="랜 어댑터 이름")
     a = ap.parse_args()
     pi = f"pi@{a.pi_ip}"
 
@@ -152,6 +245,8 @@ def main():
         sys.exit(1)
     if not ping(a.pi_ip):
         sys.exit(f"[실행] 파이 {a.pi_ip} 응답 없음 — 랜선, 파이 전원 확인")
+    if not ensure_ssh_key(pi):
+        sys.exit(1)
     log(f"파이 {a.pi_ip} 연결됨 → 서버 시작")
 
     server = PiServer(ssh_cmd(pi, remote_start(a.pull)))
@@ -163,7 +258,10 @@ def main():
             return
         server.quiet = True
         log("원점 완료 → 노트북 송신 시작 (Ctrl+C: 모두 종료)")
-        sender = subprocess.Popen(sender_args(a, a.pi_ip))
+        py = find_python()
+        if py == sys.executable and CONDA_ENV not in py:
+            log(f"conda {CONDA_ENV} 환경을 못 찾아 지금 파이썬으로 실행 (카메라 모드면 ultralytics 필요)")
+        sender = subprocess.Popen(sender_args(a, a.pi_ip, py))
         while sender.poll() is None:
             if server.proc.poll() is not None:
                 log(f"파이 서버가 멈춤: {server.failed}")
