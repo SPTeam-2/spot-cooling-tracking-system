@@ -33,6 +33,11 @@ stepper:
   pulley_teeth: 20        # 20T → 1회전당 40mm 이동
   # mm_per_step = (pitch * teeth) / (steps_per_rev * microstep) = 40 / 1600 = 0.025
 
+# 깊이 = 카메라(어깨 너비) · 초음파 가중 평균
+depth:
+  sonar_weight: 0.5         # 초음파 비중 0~1 (0.5 = 카메라 50 : 초음파 50, 0.7 = 30 : 70)
+  max_gap_mm: 400           # 두 값이 이보다 차이 나면 초음파는 벽·사물로 보고 카메라만 씀
+
 # 깊이(mm) → 송풍 세기 3단계 (멀수록 강풍)
 fan_power:
   near_max_mm: 500        # ≤500mm   → 미풍

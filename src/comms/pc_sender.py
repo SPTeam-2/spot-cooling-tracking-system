@@ -3,6 +3,7 @@
 연결 테스트: python3 src/comms/pc_sender.py --host <파이IP> --demo
 고정 목표:   python3 src/comms/pc_sender.py --host <파이IP> --target 200   (--duty 팬 세기, --pan·--tilt 각도)
 실제 통합:   python3 src/comms/pc_sender.py --host <파이IP>   (카메라 사용, --source로 영상 파일 가능)
+파이가 돌려보내는 초음파 거리는 카메라 깊이와 합쳐 팬 세기에 쓴다 (--target·--demo에선 화면 출력만).
 """
 
 from __future__ import annotations
@@ -16,30 +17,57 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
-from protocol import PORT, Command
+from protocol import PORT, STATUS_FRESH_S, Command, Status
 
 
 class PiLink:
     def __init__(self, host: str, port: int = PORT):
         self.addr = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setblocking(False)
+        self._sonar_mm, self._status_rx = None, 0.0
 
     def send(self, target_mm: float, fan_duty: int, active: bool,
              pan_deg: float = 0.0, tilt_deg: float = 0.0):
         cmd = Command(target_mm, fan_duty, active, time.time(), pan_deg, tilt_deg)
         self.sock.sendto(cmd.to_bytes(), self.addr)
 
+    def poll(self):
+        """쌓인 Status를 모두 읽고 최신 초음파 값만 남긴다."""
+        while True:
+            try:
+                data, _ = self.sock.recvfrom(1024)
+            except OSError:   # 비었음, 또는 파이가 아직 안 떠 있어 생긴 ICMP 거부
+                return
+            try:
+                st = Status.from_bytes(data)
+            except Exception:
+                continue
+            self._sonar_mm, self._status_rx = st.sonar_mm, time.time()
+
+    def sonar_mm(self, now: float | None = None):
+        self.poll()
+        now = time.time() if now is None else now
+        return self._sonar_mm if now - self._status_rx < STATUS_FRESH_S else None
+
+
+def _sonar_text(mm):
+    return "초음파 -" if mm is None else f"초음파 {mm:5.0f}mm"
+
 
 def demo(link: PiLink, hz: int = 20):
     """카메라 없이 목표를 왕복시켜 파이와의 연결을 확인한다."""
     print(f"[노트북] 데모 송신 → {link.addr} (Ctrl+C 종료)")
-    t0 = time.time()
+    t0 = last_log = time.time()
     while True:
         t = time.time() - t0
         target = 300 + 300 * math.sin(t * 0.5)
         duty = 40 + int(60 * (0.5 + 0.5 * math.sin(t * 0.3)))
         pan = 15 * math.sin(t * 0.4)
         link.send(target, duty, True, pan, 0.0)
+        if time.time() - last_log > 0.5:
+            print(f"  목표 {target:5.0f}mm | 팬 {duty:>3}% | {_sonar_text(link.sonar_mm())}")
+            last_log = time.time()
         time.sleep(1.0 / hz)
 
 
@@ -48,8 +76,12 @@ def hold(link: PiLink, target_mm: float, duty: int, pan: float = 0.0, tilt: floa
     """같은 목표를 계속 보낸다 (캐리지 이동·팬틸트 시험용)."""
     print(f"[노트북] 고정 목표 {target_mm}mm, 팬 {duty}%, pan {pan}° tilt {tilt}° → {link.addr}"
           " (Ctrl+C 종료)")
+    last_log = 0.0
     while True:
         link.send(target_mm, duty, True, pan, tilt)
+        if time.time() - last_log > 0.5:
+            print(f"  {_sonar_text(link.sonar_mm())}")
+            last_log = time.time()
         time.sleep(1.0 / hz)
 
 
@@ -82,14 +114,15 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
                 break
             obs = perception.update(frame)
             now = time.time()
-            target_mm, duty, active = integ.step(obs, now)
+            sonar = link.sonar_mm(now)
+            target_mm, duty, active = integ.step(obs, now, sonar)
             link.send(target_mm, duty, active, integ.pan_deg, integ.tilt_deg)
 
             tid = integ.target.wid if active else None
             if now - last_log > 0.5:
                 if active:
                     print(f"  대상 ID {tid} | 레일 {target_mm:5.0f}mm | 깊이 {integ.depth_mm:5.0f}mm"
-                          f" | 팬 {duty:>3}% | pan {integ.pan_deg:+5.1f}° tilt {integ.tilt_deg:+5.1f}°"
+                          f" ({_sonar_text(sonar)}) | 팬 {duty:>3}% | pan {integ.pan_deg:+5.1f}° tilt {integ.tilt_deg:+5.1f}°"
                           f" | 보이는 사람 {len(obs)}명")
                 else:
                     print(f"  대상 없음 | 보이는 사람 {len(obs)}명")
