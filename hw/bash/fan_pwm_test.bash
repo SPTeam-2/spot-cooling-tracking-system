@@ -11,7 +11,7 @@ import pigpio, time
 
 FAN  = 18                 # BCM 18 (물리 12번)
 FREQ = 1000               # PWM 주파수(Hz)
-HOLD = 3                  # 단계마다 유지 시간(초)
+HOLD = 6                  # 단계마다 유지 시간(초)
 
 pi = pigpio.pi()
 if not pi.connected:

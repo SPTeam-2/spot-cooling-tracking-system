@@ -10,7 +10,7 @@ import pigpio, time
 
 STEP, DIR, EN = 20, 21, 16
 MICRO      = 8            # 1/8 스텝
-SPEED_MM_S = 6.25         # 250Hz (1/8 기준)
+SPEED_MM_S = 8         # 250Hz (1/8 기준)
 DIRECTION  = 1            # 0 또는 1
 RAMP_S     = 0.3          # 가속/감속 단계 하나당 시간(초)
 
