@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import socket
 import sys
 import threading
@@ -125,7 +126,13 @@ def control_loop(rail, fan, aim=None, sonar=None, sock=None):
         time.sleep(LOOP_S)
 
 
+def _interrupt(_sig, _frame):
+    raise KeyboardInterrupt
+
+
 def main():
+    for sig in (signal.SIGTERM, signal.SIGHUP):   # pkill·SSH 끊김에도 Ctrl+C처럼 팬·모터 정리
+        signal.signal(sig, _interrupt)
     ap = argparse.ArgumentParser()
     ap.add_argument("--dummy", action="store_true", help="GPIO 없이 가상 레일로 동작만 출력")
     ap.add_argument("--sonar-mm", type=float, help="--dummy에서 돌려보낼 가짜 초음파 거리(mm)")
