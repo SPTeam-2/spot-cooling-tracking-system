@@ -130,7 +130,7 @@ class StepperHardware:
         self._sleep(self._delay)
         self._enabled = True
 
-    # ---- 방식 B: 한 펄스 직접 출력 (예비, 콜백 없는 모의 장치와 같은 방식) ----
+    # ---- 방식 B: 한 펄스 직접 출력 (예비, 기존 모의 테스트의 가짜 모터와 같은 방식) ----
     def step_once(self):
         """STEP 한 펄스를 출력한다. 출력 도중 실패해도 LOW 복귀를 시도한다."""
         self.check_connection()

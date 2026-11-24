@@ -58,6 +58,16 @@ class RunnerTests(unittest.TestCase):
         self.gpio.cleanup.assert_called_once_with((5, 6))
         self.assertIn('COMPLETED', self.output.getvalue())
 
+    def test_pulse_mode_option(self):
+        self.assertEqual(runner.parse_args([]).pulse_mode, 'auto')
+        args = runner.parse_args(['--move', '--direction', '1', '--steps', '1', '--speed', '10',
+                                  '--max-speed', '20', '--positive-dir-level', '1', '--pulse-mode', 'step'])
+        self.assertEqual(self.run_args(args), 0)
+        self.hardware.step_once.assert_called_once()
+        self.assertIn('펄스 방식=step', self.output.getvalue())
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            runner.parse_args(['--pulse-mode', 'wave'])
+
     def test_input_error_before_output(self):
         self.gpio.input.side_effect = OSError('input failed')
         self.assertEqual(self.run_args(self.args()), 1)

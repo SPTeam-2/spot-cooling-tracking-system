@@ -4,6 +4,8 @@
 [코드 내용]
 설정·핀 중복·GPIO 패키지 확인, 기존 리미트와 모터 기능 연결, 한 번의 이동 실행
 테스트 YAML에서 이동 조건을 읽고 CLI 지정값을 우선 적용 / --move를 붙여야 실제 이동
+--pulse-mode로 펄스 방식 선택: auto(기본, 실제 모터는 PWM + 콜백 카운트 = 방식 A) / pwm / step(한 펄스씩 직접 출력 = 방식 B)
+같은 스텝을 A·B로 돌려 비교 → 둘 다 회전량이 흔들리면 코드가 아니라 배선·기구 문제
 Ctrl+C·오류·정상 종료 시 모터와 리미트의 정리를 각각 시도
 [플로우 간단 정리]
 인자·설정 검사 → GPIO·리미트 확인 → 모터 출력 초기화 → 선택적 이동 → 결과 표시 → 장치 정리
@@ -55,6 +57,8 @@ def parse_args(argv=None):
     parser.add_argument('--positive-dir-level', type=int, choices=(0, 1), help='+방향의 실제 DIR 레벨')
     parser.add_argument('--io-timeout', type=positive_float, default=None,
                         help='pigpiod 연결·명령별 제한 시간(초), 정지거리 보장값은 아님')
+    parser.add_argument('--pulse-mode', choices=('auto', 'pwm', 'step'), default='auto',
+                        help='auto=실제 모터는 PWM(방식 A) / pwm=방식 A 강제 / step=한 펄스씩 직접 출력(방식 B, 비교용)')
     args = parser.parse_args(argv)
     fields = ('direction', 'steps', 'speed', 'max_speed', 'positive_dir_level')
     # YAML에 값이 있어도 --move 없이는 이동하지 않는다. 직접 준 이동 인자는 오입력을 알린다.
@@ -178,10 +182,11 @@ def run(args, pins, *, gpio, hardware_factory=StepperHardware, sleep=time.sleep)
             reserved_pins=tuple(pins['limit_switch'].values()),
             command_timeout_s=args.io_timeout)
         if args.move:
+            motor = StepperFunctions(hardware, limits, max_speed_steps_s=args.max_speed,
+                                     pulse_mode=args.pulse_mode)
             print(f'시험 설정: {args.test_config.resolve()}, 방향={args.direction}, 스텝={args.steps}, '
                   f'속도={args.speed}, 상한={args.max_speed}, +DIR={args.positive_dir_level}, '
-                  f'통신 제한={args.io_timeout}s', flush=True)
-            motor = StepperFunctions(hardware, limits, max_speed_steps_s=args.max_speed)
+                  f'통신 제한={args.io_timeout}s, 펄스 방식={motor.pulse_mode}', flush=True)
             result = motor.start_move(args.direction, args.steps, speed_steps_s=args.speed)
             print('이동 접수:', result.reason.value, '/ Ctrl+C: STOP', flush=True)
             while result.reason == StepperReason.RUNNING:
