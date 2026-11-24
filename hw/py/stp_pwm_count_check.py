@@ -13,9 +13,9 @@
       리미트는 확인하지 않는다. 캐리지를 레일 가운데 두고, 1600스텝(1/8 기준 40mm)보다 여유가 있는지 확인 후 실행.
       출력 핀 콜백 카운트가 실제 출력 펄스와 같다는 전제는 축 표시(실물)로 함께 확인한다.
 
-예)  python3 hw/py/stepper_pwm_count_check.py                      # 1600스텝, 250Hz, 가감속 포함, 3회
-     python3 hw/py/stepper_pwm_count_check.py --shuttle --runs 4    # 왕복 반복 (표시 위치 복귀 확인)
-     python3 hw/py/stepper_pwm_count_check.py --no-ramp --hz 200    # 가감속 없이 200Hz만
+예)  python3 hw/py/stp_pwm_count_check.py                      # 1600스텝, 250Hz, 가감속 포함, 3회
+     python3 hw/py/stp_pwm_count_check.py --shuttle --runs 4    # 왕복 반복 (표시 위치 복귀 확인)
+     python3 hw/py/stp_pwm_count_check.py --no-ramp --hz 200    # 가감속 없이 200Hz만
 """
 
 from __future__ import annotations
