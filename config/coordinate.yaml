@@ -60,7 +60,7 @@ control:
 pan_tilt:
   mode: fixed               # fixed: 아래 고정 각도 / auto: 깊이·캐리지 위치로 계산
   fixed_pan_deg: 0
-  fixed_tilt_deg: 0
+  fixed_tilt_deg: 17        # + = 위. 1m 앞 서 있는 사람 가슴(1200mm)을 팬 높이(892mm)에서 겨냥 = atan(308/1000)
   fan_height_mm: 892        # 바닥~팬 중심 (책상 750 추정 + 책상면~팬 중심 142 실측)
   aim_height_mm: 1200       # 바닥~겨냥 높이 (서 있는 사람 가슴)
   max_pan_deg: 30           # 노트북 계산 상한, 파이는 pan_tilt_test.yaml 범위로 한 번 더 제한
