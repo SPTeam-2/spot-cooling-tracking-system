@@ -28,10 +28,17 @@ def motor_on_right(transformer, w, h):
         return False
 
 
-def draw(frame, obs, integ, rail_range, duty, active, sonar_mm=None, flip=False):
+def draw(frame, obs, integ, rail_range, duty, active, sonar_mm=None, flip=False, mirror=False):
+    """mirror=True면 화면만 좌우 반전 (인식·좌표는 원본 기준 그대로)."""
     tid = integ.target.wid if active and integ.target is not None else None
+    w0 = frame.shape[1]
+    if mirror:
+        frame = cv2.flip(frame, 1)
+        flip = not flip
     for o in obs:
         x1, y1, x2, y2 = o.bbox
+        if mirror:
+            x1, x2 = w0 - 1 - x2, w0 - 1 - x1
         hit = o.track_id == tid
         c = RED if hit else GREEN
         cv2.rectangle(frame, (x1, y1), (x2, y2), c, 4 if hit else 2)

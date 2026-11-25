@@ -104,6 +104,8 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
         cfg = yaml.safe_load(f)
     integ = Integrator(cfg)
     rail_range = cfg.get("rail_range", [0, 600])
+    with open("config/camera.yaml", encoding="utf-8") as f:
+        mirror = bool((yaml.safe_load(f) or {}).get("mirror_display", False))
     perception = Perception.from_config()
     if source.isdigit():
         cap = cv2.VideoCapture(int(source), cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY)
@@ -139,13 +141,16 @@ def integration_loop(link: PiLink, source: str = "0", show: bool = True):
                 last_log = now
             if show:
                 if win is None:
-                    win = "spot cooler (q: quit)"
+                    win = "spot cooler (q: quit, m: mirror)"
                     cv2.namedWindow(win, cv2.WINDOW_NORMAL)
                     cv2.resizeWindow(win, 1280, 720)
                     flip = overlay.motor_on_right(perception.transformer, frame.shape[1], frame.shape[0])
-                cv2.imshow(win, overlay.draw(frame, obs, integ, rail_range, duty, active, sonar, flip))
-                if cv2.waitKey(1) & 0xFF == ord("q"):
+                cv2.imshow(win, overlay.draw(frame, obs, integ, rail_range, duty, active, sonar, flip, mirror))
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
                     break
+                if key == ord("m"):
+                    mirror = not mirror
     except KeyboardInterrupt:
         pass
     finally:

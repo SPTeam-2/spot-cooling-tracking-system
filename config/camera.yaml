@@ -3,3 +3,4 @@ index: 0
 width: 1280
 height: 720
 fps: 30
+mirror_display: true   # 통합 화면만 좌우 반전 (거울처럼). 인식·캘리브레이션은 원본 기준. 실행 중 m으로 전환
